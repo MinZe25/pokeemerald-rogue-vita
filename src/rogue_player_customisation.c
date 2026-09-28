@@ -1816,6 +1816,11 @@ static const u16* ModifyOutfitCompressedPalette(const struct PlayerOutfit* outfi
     u16* basePal = &tempBuffer[16];
     u16* layerPal = &tempBuffer[32];
 
+#ifdef PORTABLE
+    // Outfits without back sprites have no palette; on GBA this reads the BIOS region
+    if (basePalSrc == NULL)
+        return DEFAULT_PAL_TO_LOAD;
+#endif
     LZ77UnCompWram(basePalSrc, basePal);
 
     if(layerPalSrc != NULL)

@@ -142,6 +142,8 @@ void CpuFastSet(const void *src, void *dst, u32 cnt)
 
 void LZ77UnCompVram(const u32 *src_, void *dest_)
 {
+    if (src_ == NULL) // GBA would read the BIOS region here
+        return;
     const u8 *src = src_;
     u8 *dest = dest_;
     int destSize = (src[3] << 16) | (src[2] << 8) | src[1];
@@ -192,6 +194,8 @@ fail:
 
 void LZ77UnCompWram(const u32 *src, void *dst)
 {
+    if (src == NULL) // GBA would read the BIOS region here
+        return;
     const uint8_t *source = src;
     uint8_t *dest = dst;
 
@@ -238,6 +242,8 @@ void LZ77UnCompWram(const u32 *src, void *dst)
 
 void RLUnCompWram(const void *src, void *dest)
 {
+    if (src == NULL) // GBA would read the BIOS region here
+        return;
     int remaining = CPUReadMemory(src) >> 8;
     int padding = (4 - remaining) & 0x3;
     int blockHeader;
@@ -282,6 +288,8 @@ void RLUnCompWram(const void *src, void *dest)
 
 void RLUnCompVram(const void *src, void *dest)
 {
+    if (src == NULL) // GBA would read the BIOS region here
+        return;
     int remaining = CPUReadMemory(src) >> 8;
     int padding = (4 - remaining) & 0x3;
     int blockHeader;

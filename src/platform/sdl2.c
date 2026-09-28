@@ -60,6 +60,9 @@ double timeScale = 1.0;
 struct SiiRtcInfo internalClock;
 
 static FILE *sSaveFile = NULL;
+#ifdef __vita__
+static SDL_AudioStream *sAudioStream = NULL;
+#endif
 
 extern void AgbMain(void);
 extern void MainLoop(void);
@@ -101,7 +104,7 @@ static void PlatformLog(const char *fmt, ...)
 
 // Frame timing statistics, logged every 600 frames when ROGUE_PERFLOG=1
 static bool sPerfLog = false;
-static double sPerfLogic, sPerfDraw, sPerfWorst;
+static double sPerfLogic, sPerfDraw, sPerfAudio, sPerfWorst;
 static unsigned sPerfFrames;
 
 static double NowMs(void)
@@ -122,6 +125,8 @@ static bool sHeadless = false;
 static unsigned long sFrameCount = 0;
 static unsigned long sMaxFrames = 0;
 static unsigned long sDumpEvery = 0;
+static unsigned long sBattleFrame = 0;
+extern void Harness_StartTestBattle(void);
 static const char *sDumpList = NULL;
 static const char *sInputScript = NULL;
 static uint16_t sFrameImage[DISPLAY_WIDTH * DISPLAY_HEIGHT];
@@ -296,7 +301,12 @@ static void InitTestHarness(void)
     if ((v = getenv("ROGUE_DUMPEVERY")) != NULL)
         sDumpEvery = strtoul(v, NULL, 10);
     sDumpList = getenv("ROGUE_DUMP");
+    if ((v = getenv("ROGUE_BATTLE")) != NULL)
+        sBattleFrame = strtoul(v, NULL, 10);
     sPerfLog = (v = getenv("ROGUE_PERFLOG")) != NULL && *v == '1';
+#ifdef __vita__
+    sPerfLog = true; // cheap, and the only way to see real hardware performance
+#endif
     sInputScript = getenv("ROGUE_INPUT");
     if (sHeadless)
     {
@@ -312,6 +322,8 @@ static bool RunGameFrame(bool draw)
 
     //run game logic, draw frame and process DMAs and vblank
     ENTER_VBLANK(); //you must be in VBlank before running a game tick
+    if (sBattleFrame != 0 && sFrameCount == sBattleFrame)
+        Harness_StartTestBattle();
     MainLoop();
     if (sPerfLog)
         t1 = NowMs();
@@ -327,9 +339,9 @@ static bool RunGameFrame(bool draw)
             sPerfWorst = t2 - t0;
         if (++sPerfFrames == 600)
         {
-            PlatformLog("frame %lu: avg logic %.2f ms, avg draw %.2f ms, worst frame %.2f ms\n",
-                        sFrameCount, sPerfLogic / sPerfFrames, sPerfDraw / sPerfFrames, sPerfWorst);
-            sPerfLogic = sPerfDraw = sPerfWorst = 0;
+            PlatformLog("frame %lu: avg logic %.2f ms, avg draw %.2f ms, avg audio %.2f ms, worst frame %.2f ms\n",
+                        sFrameCount, sPerfLogic / sPerfFrames, sPerfDraw / sPerfFrames, sPerfAudio / sPerfFrames, sPerfWorst);
+            sPerfLogic = sPerfDraw = sPerfAudio = sPerfWorst = 0;
             sPerfFrames = 0;
         }
     }
@@ -419,10 +431,15 @@ int main(int argc, char **argv)
     want.channels = 2;
     want.samples = 1024;
     cgb_audio_init(want.freq);
+#ifdef __vita__
+    // Vita audio ports only accept standard rates: mix at 42048 Hz, resample to 48 kHz
+    want.freq = 48000;
+    sAudioStream = SDL_NewAudioStream(AUDIO_F32, 2, 42048, AUDIO_F32, 2, 48000);
+#endif
 
 
     if (SDL_OpenAudio(&want, 0) < 0)
-        SDL_Log("Failed to open audio: %s", SDL_GetError());
+        PlatformLog("Failed to open audio: %s\n", SDL_GetError());
     else
     {
         if (want.format != AUDIO_F32) /* we let this one thing change. */
@@ -481,7 +498,10 @@ int main(int argc, char **argv)
             //this is all done to sync audio to gameplay
             if (SDL_GetQueuedAudioSize(1)/8 < 2000)
             {
+                double ta = sPerfLog ? NowMs() : 0;
                 AudioUpdate();
+                if (sPerfLog)
+                    sPerfAudio += NowMs() - ta;
             }
 
             if (videoScaleChanged)
@@ -600,6 +620,18 @@ void Platform_QueueAudio(float *audioBuffer, s32 samplesPerFrame)
     if (sRawAudio != NULL)
         fwrite(audioBuffer, 1, samplesPerFrame, sRawAudio);
 
+#ifdef __vita__
+    if (sAudioStream != NULL)
+    {
+        static float sResampled[8192];
+        int got;
+
+        SDL_AudioStreamPut(sAudioStream, audioBuffer, samplesPerFrame);
+        while ((got = SDL_AudioStreamGet(sAudioStream, sResampled, sizeof(sResampled))) > 0)
+            SDL_QueueAudio(1, sResampled, got);
+        return;
+    }
+#endif
     SDL_QueueAudio(1, audioBuffer, samplesPerFrame);
 }
 
