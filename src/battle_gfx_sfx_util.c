@@ -1220,7 +1220,18 @@ void SpriteCB_EnemyShadow(struct Sprite *shadowSprite)
     bool8 invisible = FALSE;
     u8 battler = shadowSprite->tBattlerId;
     struct Sprite *battlerSprite = &gSprites[gBattlerSpriteIds[battler]];
-    u16 transformSpecies = SanitizeSpeciesId(gBattleSpritesDataPtr->battlerData[battler].transformSpecies);
+    u16 transformSpecies;
+
+#ifdef PORTABLE
+    // The shadow can still be animated for a frame after the battle sprite data is freed
+    // (e.g. leaving the party screen after a catch); on GBA the NULL read is harmless.
+    if (gBattleSpritesDataPtr == NULL)
+    {
+        shadowSprite->callback = SpriteCB_SetInvisible;
+        return;
+    }
+#endif
+    transformSpecies = SanitizeSpeciesId(gBattleSpritesDataPtr->battlerData[battler].transformSpecies);
 
     if (!battlerSprite->inUse || !IsBattlerSpritePresent(battler))
     {

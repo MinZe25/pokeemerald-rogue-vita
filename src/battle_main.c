@@ -5668,6 +5668,18 @@ static void FreeResetData_ReturnToOvOrDoEvolutions(void)
     {
         gIsFishingEncounter = FALSE;
         gIsSurfingEncounter = FALSE;
+#ifdef PORTABLE
+        // Free here, together with the sprite reset. Freeing on every frame of the
+        // fade-out (below) leaves battle sprites animating with freed data, which
+        // crashes on PC/Vita (use after free).
+        FreeAllWindowBuffers();
+        if (!(gBattleTypeFlags & BATTLE_TYPE_LINK))
+        {
+            FreeMonSpritesGfx();
+            FreeBattleResources();
+            FreeBattleSpritesData();
+        }
+#endif
         ResetSpriteData();
         if (!(gBattleTypeFlags & (BATTLE_TYPE_LINK
                                   | BATTLE_TYPE_RECORDED_LINK
@@ -5691,6 +5703,7 @@ static void FreeResetData_ReturnToOvOrDoEvolutions(void)
         // RogueNote: Release pokemon here
     }
 
+#ifndef PORTABLE
     FreeAllWindowBuffers();
     if (!(gBattleTypeFlags & BATTLE_TYPE_LINK))
     {
@@ -5698,6 +5711,7 @@ static void FreeResetData_ReturnToOvOrDoEvolutions(void)
         FreeBattleResources();
         FreeBattleSpritesData();
     }
+#endif
 }
 
 static void TrySpecialEvolution(void) // Attempts to perform non-level related battle evolutions (not the script command).
