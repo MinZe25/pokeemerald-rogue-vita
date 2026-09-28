@@ -10,6 +10,9 @@
 #include "constants/vars.h"
 #include "constants/wild_encounter.h"
 	.include "asm/macros.inc"
+	.ifdef PORTABLE
+	.include "data/specials_local.inc"
+	.endif
 	.include "asm/macros/event.inc"
 	.include "constants/constants.inc"
 

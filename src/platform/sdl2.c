@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <time.h>
 
 #ifdef _WIN32
@@ -10,6 +11,22 @@
 #endif
 
 #include <SDL2/SDL.h>
+
+#ifdef __vita__
+#include <psp2/ctrl.h>
+#include <psp2/power.h>
+#include <psp2/io/stat.h>
+#include <psp2/kernel/processmgr.h>
+
+// Rogue's code can use a fair amount of stack; the default is 256KB
+int sceUserMainThreadStackSize = 4 * 1024 * 1024;
+unsigned int _newlib_heap_size_user = 128 * 1024 * 1024;
+
+#define DATA_DIR "ux0:data/pokeemerald_rogue/"
+#else
+#define DATA_DIR ""
+#endif
+#define SAVE_PATH DATA_DIR "pokeemerald.sav"
 
 #include "global.h"
 #include "platform.h"
@@ -57,6 +74,40 @@ static void StoreSaveFile(void);
 static void CloseSaveFile(void);
 
 static void UpdateInternalClock(void);
+
+// Log file (DATA_DIR/log.txt) - also echoed to stdout on desktop
+static void PlatformLog(const char *fmt, ...)
+{
+    va_list args;
+#ifdef __vita__
+    static bool sStarted = false;
+    // Reopened per message so every line is committed even if the app is killed
+    FILE *log = fopen(DATA_DIR "log.txt", sStarted ? "a" : "w");
+
+    sStarted = true;
+    va_start(args, fmt);
+    if (log != NULL)
+    {
+        vfprintf(log, fmt, args);
+        fclose(log);
+    }
+    va_end(args);
+#else
+    va_start(args, fmt);
+    vprintf(fmt, args);
+    va_end(args);
+#endif
+}
+
+// Frame timing statistics, logged every 600 frames when ROGUE_PERFLOG=1
+static bool sPerfLog = false;
+static double sPerfLogic, sPerfDraw, sPerfWorst;
+static unsigned sPerfFrames;
+
+static double NowMs(void)
+{
+    return (double)SDL_GetPerformanceCounter() * 1000.0 / (double)SDL_GetPerformanceFrequency();
+}
 
 // ---------------------------------------------------------------------------
 // Test harness, driven by environment variables:
@@ -158,7 +209,7 @@ static void DumpFrame(unsigned long frame)
     FILE *f;
     int rowSize = DISPLAY_WIDTH * 3;
 
-    snprintf(path, sizeof(path), "frame_%06lu.bmp", frame);
+    snprintf(path, sizeof(path), DATA_DIR "frame_%06lu.bmp", frame);
     f = fopen(path, "wb");
     if (f == NULL)
         return;
@@ -189,6 +240,52 @@ static void DumpFrame(unsigned long frame)
     fclose(f);
 }
 
+#ifdef __vita__
+// The Vita has no environment; read KEY=VALUE lines from DATA_DIR/harness.txt
+static char sHarnessFile[65536];
+
+static const char *HarnessGetenv(const char *name)
+{
+    static bool sLoaded = false;
+    static char sValue[65536];
+    size_t nameLen = strlen(name);
+    const char *p;
+
+    if (!sLoaded)
+    {
+        FILE *f = fopen(DATA_DIR "harness.txt", "rb");
+        sLoaded = true;
+        if (f != NULL)
+        {
+            size_t n = fread(sHarnessFile, 1, sizeof(sHarnessFile) - 1, f);
+            sHarnessFile[n] = 0;
+            fclose(f);
+        }
+    }
+    for (p = sHarnessFile; *p; )
+    {
+        const char *eol = strchr(p, '\n');
+        size_t lineLen = eol ? (size_t)(eol - p) : strlen(p);
+        if (lineLen > nameLen && strncmp(p, name, nameLen) == 0 && p[nameLen] == '=')
+        {
+            size_t valLen = lineLen - nameLen - 1;
+            while (valLen > 0 && (p[nameLen + 1 + valLen - 1] == '\r'))
+                valLen--;
+            if (valLen >= sizeof(sValue))
+                valLen = sizeof(sValue) - 1;
+            memcpy(sValue, p + nameLen + 1, valLen);
+            sValue[valLen] = 0;
+            return strdup(sValue);
+        }
+        if (!eol)
+            break;
+        p = eol + 1;
+    }
+    return NULL;
+}
+#define getenv HarnessGetenv
+#endif
+
 static void InitTestHarness(void)
 {
     const char *v;
@@ -199,6 +296,7 @@ static void InitTestHarness(void)
     if ((v = getenv("ROGUE_DUMPEVERY")) != NULL)
         sDumpEvery = strtoul(v, NULL, 10);
     sDumpList = getenv("ROGUE_DUMP");
+    sPerfLog = (v = getenv("ROGUE_PERFLOG")) != NULL && *v == '1';
     sInputScript = getenv("ROGUE_INPUT");
     if (sHeadless)
     {
@@ -210,12 +308,31 @@ static void InitTestHarness(void)
 // Runs one emulated frame; returns false when the harness wants to quit
 static bool RunGameFrame(bool draw)
 {
+    double t0 = sPerfLog ? NowMs() : 0, t1 = 0, t2 = 0;
+
     //run game logic, draw frame and process DMAs and vblank
     ENTER_VBLANK(); //you must be in VBlank before running a game tick
     MainLoop();
+    if (sPerfLog)
+        t1 = NowMs();
     if (draw || sHeadless)
         VDraw(sdlTexture);
     RunDMAsAndVBlank();
+    if (sPerfLog)
+    {
+        t2 = NowMs();
+        sPerfLogic += t1 - t0;
+        sPerfDraw += t2 - t1;
+        if (t2 - t0 > sPerfWorst)
+            sPerfWorst = t2 - t0;
+        if (++sPerfFrames == 600)
+        {
+            PlatformLog("frame %lu: avg logic %.2f ms, avg draw %.2f ms, worst frame %.2f ms\n",
+                        sFrameCount, sPerfLogic / sPerfFrames, sPerfDraw / sPerfFrames, sPerfWorst);
+            sPerfLogic = sPerfDraw = sPerfWorst = 0;
+            sPerfFrames = 0;
+        }
+    }
 
     sFrameCount++;
     if (ShouldDumpFrame(sFrameCount))
@@ -234,33 +351,50 @@ int main(int argc, char **argv)
     freopen( "CON", "w", stdout ) ;
 #endif
 
+#ifdef __vita__
+    scePowerSetArmClockFrequency(444);
+    scePowerSetBusClockFrequency(222);
+    scePowerSetGpuClockFrequency(222);
+    scePowerSetGpuXbarClockFrequency(166);
+    sceIoMkdir("ux0:data", 0777);
+    sceIoMkdir(DATA_DIR, 0777);
+    sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
+    PlatformLog("pokeemerald_rogue starting\n");
+#endif
+
     InitTestHarness();
-    ReadSaveFile("pokeemerald.sav");
+    ReadSaveFile(SAVE_PATH);
 
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0)
     {
-        DBGPRINTF("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
+        PlatformLog("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
         return 1;
     }
 
+#ifdef __vita__
+    sdlWindow = SDL_CreateWindow("pokeemerald", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 960, 544, SDL_WINDOW_SHOWN);
+#else
     sdlWindow = SDL_CreateWindow("pokeemerald", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, DISPLAY_WIDTH * videoScale, DISPLAY_HEIGHT * videoScale, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+#endif
     if (sdlWindow == NULL)
     {
-        DBGPRINTF("Window could not be created! SDL_Error: %s\n", SDL_GetError());
+        PlatformLog("Window could not be created! SDL_Error: %s\n", SDL_GetError());
         return 1;
     }
 
     sdlRenderer = SDL_CreateRenderer(sdlWindow, -1, SDL_RENDERER_PRESENTVSYNC);
     if (sdlRenderer == NULL)
     {
-        DBGPRINTF("Renderer could not be created! SDL_Error: %s\n", SDL_GetError());
+        PlatformLog("Renderer could not be created! SDL_Error: %s\n", SDL_GetError());
         return 1;
     }
 
     SDL_SetRenderDrawColor(sdlRenderer, 255, 255, 255, 255);
     SDL_RenderClear(sdlRenderer);
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
+#ifndef __vita__
     SDL_RenderSetLogicalSize(sdlRenderer, DISPLAY_WIDTH, DISPLAY_HEIGHT);
+#endif
 
     sdlTexture = SDL_CreateTexture(sdlRenderer,
                                    SDL_PIXELFORMAT_ABGR1555,
@@ -268,7 +402,7 @@ int main(int argc, char **argv)
                                    DISPLAY_WIDTH, DISPLAY_HEIGHT);
     if (sdlTexture == NULL)
     {
-        DBGPRINTF("Texture could not be created! SDL_Error: %s\n", SDL_GetError());
+        PlatformLog("Texture could not be created! SDL_Error: %s\n", SDL_GetError());
         return 1;
     }
 
@@ -296,7 +430,9 @@ int main(int argc, char **argv)
         SDL_PauseAudio(0);
     }
 
+    PlatformLog("SDL ready, starting game\n");
     AgbMain();
+    PlatformLog("AgbMain done\n");
 
     double accumulator = 0.0;
 
@@ -357,7 +493,17 @@ int main(int argc, char **argv)
 
         lastGameTime = curGameTime;
 
+#ifdef __vita__
+        {
+            // 3x integer scale, centred on the 960x544 screen
+            SDL_Rect dst = { (960 - DISPLAY_WIDTH * 3) / 2, (544 - DISPLAY_HEIGHT * 3) / 2, DISPLAY_WIDTH * 3, DISPLAY_HEIGHT * 3 };
+            SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, 255);
+            SDL_RenderClear(sdlRenderer);
+            SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, &dst);
+        }
+#else
         SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, NULL);
+#endif
         SDL_RenderPresent(sdlRenderer);
     }
 
@@ -365,6 +511,9 @@ int main(int argc, char **argv)
 
     SDL_DestroyWindow(sdlWindow);
     SDL_Quit();
+#ifdef __vita__
+    sceKernelExitProcess(0);
+#endif
     return 0;
 }
 
@@ -400,6 +549,7 @@ static void StoreSaveFile()
     {
         fseek(sSaveFile, 0, SEEK_SET);
         fwrite(FLASH_BASE, 1, sizeof(FLASH_BASE), sSaveFile);
+        fflush(sSaveFile);
     }
 }
 
@@ -410,24 +560,14 @@ void Platform_StoreSaveFile(void)
 
 void Platform_ReadFlash(u16 sectorNum, u32 offset, u8 *dest, u32 size)
 {
+    u32 start = (sectorNum << gFlash->sector.shift) + offset;
+
     DBGPRINTF("ReadFlash(sectorNum=0x%04X,offset=0x%08X,size=0x%02X)\n",sectorNum,offset,size);
-    FILE * savefile = fopen("pokeemerald.sav", "r+b");
-    if (savefile == NULL)
-    {
-        puts("Error opening save file.");
+    if (start >= sizeof(FLASH_BASE))
         return;
-    }
-    if (fseek(savefile, (sectorNum << gFlash->sector.shift) + offset, SEEK_SET))
-    {
-        fclose(savefile);
-        return;
-    }
-    if (fread(dest, 1, size, savefile) != size)
-    {
-        fclose(savefile);
-        return;
-    }
-    fclose(savefile);
+    if (start + size > sizeof(FLASH_BASE))
+        size = sizeof(FLASH_BASE) - start;
+    memcpy(dest, &FLASH_BASE[start], size);
 }
 
 void Platform_QueueAudio(float *audioBuffer, s32 samplesPerFrame)
@@ -640,9 +780,36 @@ u16 GetXInputKeys()
 }
 #endif // _WIN32
 
+#ifdef __vita__
+// Cross=A, Circle=B, L/R triggers, Start/Select, d-pad or left stick; hold Triangle to fast-forward
+static u16 GetVitaKeys(void)
+{
+    SceCtrlData pad;
+    u16 k = 0;
+
+    if (sceCtrlPeekBufferPositive(0, &pad, 1) < 0)
+        return 0;
+    if (pad.buttons & SCE_CTRL_CROSS)    k |= A_BUTTON;
+    if (pad.buttons & SCE_CTRL_CIRCLE)   k |= B_BUTTON;
+    if (pad.buttons & SCE_CTRL_START)    k |= START_BUTTON;
+    if (pad.buttons & SCE_CTRL_SELECT)   k |= SELECT_BUTTON;
+    if (pad.buttons & SCE_CTRL_LTRIGGER) k |= L_BUTTON;
+    if (pad.buttons & SCE_CTRL_RTRIGGER) k |= R_BUTTON;
+    if ((pad.buttons & SCE_CTRL_UP)    || pad.ly < 64)  k |= DPAD_UP;
+    if ((pad.buttons & SCE_CTRL_DOWN)  || pad.ly > 192) k |= DPAD_DOWN;
+    if ((pad.buttons & SCE_CTRL_LEFT)  || pad.lx < 64)  k |= DPAD_LEFT;
+    if ((pad.buttons & SCE_CTRL_RIGHT) || pad.lx > 192) k |= DPAD_RIGHT;
+    timeScale = (pad.buttons & SCE_CTRL_TRIANGLE) ? 3.0 : 1.0;
+    return k;
+}
+#endif
+
 u16 Platform_GetKeyInput(void)
 {
     u16 scripted = (sInputScript != NULL) ? GetScriptedKeys(sFrameCount) : 0;
+#ifdef __vita__
+    return GetVitaKeys() | scripted;
+#endif
 #ifdef _WIN32
     u16 gamepadKeys = GetXInputKeys();
     return ((gamepadKeys != 0) ? gamepadKeys : keys) | scripted;

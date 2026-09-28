@@ -50,3 +50,4 @@ pokeemerald-*.png/pokeemerald_rogue
 /pokeemerald_rogue.exe
 /SDL2/
 *.sav
+data/specials_local.inc
