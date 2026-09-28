@@ -23,3 +23,20 @@ void Harness_StartTestBattle(void)
     BattleSetup_StartScriptedWildBattle();
 }
 #endif
+
+#ifdef PORTABLE
+#include "event_data.h"
+#include "constants/flags.h"
+void FollowMon_ClearCachedPartnerSpecies(void);
+void SetupFollowParterMonObjectEvent(void);
+
+// Give the player a party mon and turn on the following Pokémon
+void Harness_EnableFollower(void)
+{
+    if (gPlayerPartyCount == 0)
+        ScriptGiveMon(SPECIES_TREECKO, 10, ITEM_NONE, 0, 0, 0);
+    FlagSet(FLAG_SYS_SHOW_POKE_FOLLOWER);
+    FollowMon_ClearCachedPartnerSpecies();
+    SetupFollowParterMonObjectEvent();
+}
+#endif

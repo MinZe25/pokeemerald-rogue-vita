@@ -677,7 +677,7 @@ $(OBJ_DIR)/res.o: $(C_SUBDIR)/platform/win32res/res.rc $(C_SUBDIR)/platform/win3
 $(ROM): $(OBJS)
 ifeq ($(TARGET_OS),VITA)
 	@echo "$(MODERNCC) <objects> $(PC_LIBS) -o $(OBJ_DIR)/eboot.elf"
-	@cd $(OBJ_DIR) && $(MODERNCC) $(HOST_ARCH_FLAGS) $(OBJS_REL) $(PC_LIBS) -o eboot.elf
+	@cd $(OBJ_DIR) && bash ../../tools/pc/vita_link.sh eboot.elf $(MODERNCC) $(HOST_ARCH_FLAGS) $(OBJS_REL) $(PC_LIBS)
 	vita-elf-create $(OBJ_DIR)/eboot.elf $(OBJ_DIR)/eboot.velf
 	vita-make-fself -c -s $(OBJ_DIR)/eboot.velf $(OBJ_DIR)/eboot.bin
 	vita-mksfoex -s TITLE_ID=$(VITA_TITLEID) "$(VITA_TITLE)" $(OBJ_DIR)/param.sfo

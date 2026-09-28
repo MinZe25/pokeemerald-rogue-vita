@@ -128,6 +128,25 @@ static bool winCheckHorizontalBounds(u16 left, u16 right, u16 xpos)
 // Generic per-pixel renderer for 256 colour text backgrounds. The specialised
 // renderers below only handle 16 colour tiles; 8bpp BGs are rare (logos,
 // title-type screens) so this favours correctness over speed.
+// Fills [left, right) of the window mask, with GBA style wraparound when left > right
+static void FillWinRange(uint16_t *mask, unsigned int left, unsigned int right, uint16_t value)
+{
+    unsigned int x;
+
+    if (left > right)
+    {
+        for (x = left; x < DISPLAY_WIDTH; x++)
+            mask[x] = value;
+        for (x = 0; x < right && x < DISPLAY_WIDTH; x++)
+            mask[x] = value;
+    }
+    else
+    {
+        for (x = left; x < right && x < DISPLAY_WIDTH; x++)
+            mask[x] = value;
+    }
+}
+
 static void RenderBGScanline8bpp(int bgNum, uint16_t control, uint16_t hoffs, uint16_t voffs, int lineNum, uint16_t *line, struct scanlineData* scanline, bool windowsEnabled)
 {
     unsigned int charBaseBlock = (control >> 2) & 3;
@@ -2490,6 +2509,73 @@ static void inline_hack DrawNonAffineSprite(int SpriteIndex, struct scanlineData
 }
 
 // Parts of this code heavily borrowed from NanoboyAdvance.
+// OAM only changes during VBlank, so the sprites that can appear on each
+// priority are collected once per frame instead of scanning all 128 entries
+// for every priority of every scanline. Kept in the original drawing order.
+struct SpriteList
+{
+    uint8_t count;
+    uint8_t index[128];
+    bool8 complex[128];
+    int16_t top[128];
+    int16_t bottom[128];
+};
+
+static struct SpriteList sSpriteLists[4];
+
+static void BuildSpriteLists(void)
+{
+    int i;
+
+    for (i = 0; i < 4; i++)
+        sSpriteLists[i].count = 0;
+
+    for (i = 127; i >= 0; i--)
+    {
+        struct OamData *oam = &((struct OamData *)OAM)[i];
+        struct SpriteList *list;
+        int top, bottom, height;
+        bool8 complex;
+
+        if (oam->objMode == 2)
+            continue;
+        if (!(oam->affineMode & 1) && (oam->affineMode & 2)) // disabled
+            continue;
+        if (oam->shape == 3) // prohibited
+            continue;
+
+        complex = (oam->affineMode & 1) || (oam->bpp & 1) || oam->mosaic == 1;
+        if (complex)
+        {
+            // Affine/8bpp/mosaic sprites keep doing their own full bounds test
+            top = -32768;
+            bottom = 32767;
+        }
+        else
+        {
+            if (oam->shape == 0)
+                height = (1 << oam->size) * 8;
+            else if (oam->shape == 1)
+                height = spriteSizes[oam->size][0];
+            else
+                height = spriteSizes[oam->size][1];
+            top = oam->y;
+            if (top >= DISPLAY_HEIGHT)
+                top -= 256;
+            bottom = top + height;
+            if (bottom <= 0 || top >= DISPLAY_HEIGHT)
+                continue;
+        }
+
+        list = &sSpriteLists[oam->priority];
+        list->index[list->count] = i;
+        list->complex[list->count] = complex;
+        list->top[list->count] = top;
+        list->bottom[list->count] = bottom;
+        list->count++;
+    }
+}
+
 static void DrawSprites(struct scanlineData* scanline, uint16_t vcount, bool windowsEnabled, uint8_t priority, uint16_t* pixels, bool IsInsideWinIn)
 {
     int SpriteIndex;
@@ -2505,16 +2591,14 @@ static void DrawSprites(struct scanlineData* scanline, uint16_t vcount, bool win
         puts("2-D OBJ Character mapping not supported.");
     }
 
-    for (SpriteIndex = 127; SpriteIndex >= 0; SpriteIndex--)
+    struct SpriteList *list = &sSpriteLists[priority];
+
+    for (int i = 0; i < list->count; i++)
     {
-        struct OamData *oam = &((struct OamData *)OAM)[SpriteIndex];
-        
-        if (oam->priority != priority)
+        if ((int)vcount < list->top[i] || (int)vcount >= list->bottom[i])
             continue;
-        if (oam->objMode == 2)
-            continue;
-        
-        if (oam->affineMode & 1 || oam->bpp & 1 || oam->mosaic == 1)
+        SpriteIndex = list->index[i];
+        if (list->complex[i])
             DrawAffineSprite(SpriteIndex, scanline, vcount, windowsEnabled, pixels, IsInsideWinIn);
         else
             DrawNonAffineSprite(SpriteIndex, scanline, vcount, windowsEnabled, pixels, IsInsideWinIn);
@@ -2588,25 +2672,32 @@ static void DrawScanline(uint16_t *pixels, uint16_t vcount)
     IsInsideWinIn = (WIN0enable || WIN1enable || (REG_DISPCNT & DISPCNT_OBJWIN_ON && REG_DISPCNT & DISPCNT_OBJ_ON));
     
     
-    //draw to pixel mask
+    //draw to pixel mask (same priority as the GBA: WIN0 over WIN1 over outside)
     if (IsInsideWinIn)
     {
+        uint16_t outside = (REG_WINOUT & 0x3F) | WINMASK_WINOUT;
         for (xpos = 0; xpos < DISPLAY_WIDTH; xpos++)
-        {
-            //win0 checks
-            if (WIN0enable && winCheckHorizontalBounds(WIN0left, WIN0right, xpos))
-                scanline.winMask[xpos] = REG_WININ & 0x3F;
-            //win1 checks
-            else if (WIN1enable && winCheckHorizontalBounds(WIN1left, WIN1right, xpos))
-                scanline.winMask[xpos] = (REG_WININ >> 8) & 0x3F;
-            else
-                scanline.winMask[xpos] = (REG_WINOUT & 0x3F) | WINMASK_WINOUT;
-        }
+            scanline.winMask[xpos] = outside;
+        if (WIN1enable)
+            FillWinRange(scanline.winMask, WIN1left, WIN1right, (REG_WININ >> 8) & 0x3F);
+        if (WIN0enable)
+            FillWinRange(scanline.winMask, WIN0left, WIN0right, REG_WININ & 0x3F);
     }
     
     //draw to window mask if OBJwin is enabled
     if (REG_DISPCNT & DISPCNT_OBJWIN_ON && REG_DISPCNT & DISPCNT_OBJ_ON)
         DrawSpritesWinMask(&scanline, vcount);
+
+    // Which BGs the window enables on every pixel / on at least one pixel
+    uint16_t winAnd = 0xFFFF, winOr = 0;
+    if (IsInsideWinIn)
+    {
+        for (xpos = 0; xpos < DISPLAY_WIDTH; xpos++)
+        {
+            winAnd &= scanline.winMask[xpos];
+            winOr |= scanline.winMask[xpos];
+        }
+    }
     
     //init bgmask for alpha blending
     for (int i = 0; i < DISPLAY_WIDTH; i++)
@@ -2645,8 +2736,12 @@ static void DrawScanline(uint16_t *pixels, uint16_t vcount)
                     else if (IsInsideWinIn)
                     {
                         //blending check
-                        if (doesBGblend)
+                        if (!(winOr & (1 << bgnum)))
+                            ;
+                        else if (doesBGblend)
                             RenderBGScanlineWinBlend(bgnum, scanline.bgcnts[bgnum], bghoffs, bgvoffs, vcount, pixels, &scanline, windowsEnabled);
+                        else if (winAnd & (1 << bgnum))
+                            RenderBGScanlineNoEffect(bgnum, scanline.bgcnts[bgnum], bghoffs, bgvoffs, vcount, pixels, &scanline, false); // window enables this BG on every pixel
                         else
                             RenderBGScanlineWin(bgnum, scanline.bgcnts[bgnum], bghoffs, bgvoffs, vcount, pixels, &scanline, windowsEnabled);
                         
@@ -2685,8 +2780,12 @@ static void DrawScanline(uint16_t *pixels, uint16_t vcount)
                         else if (IsInsideWinIn)
                         {
                             //blending check
-                            if (doesBGblend)
+                            if (!(winOr & (1 << bgnum)))
+                                ;
+                            else if (doesBGblend)
                                 RenderBGScanlineWinBlend(bgnum, scanline.bgcnts[bgnum], bghoffs, bgvoffs, vcount, pixels, &scanline, windowsEnabled);
+                            else if (winAnd & (1 << bgnum))
+                                RenderBGScanlineNoEffect(bgnum, scanline.bgcnts[bgnum], bghoffs, bgvoffs, vcount, pixels, &scanline, false); // window enables this BG on every pixel
                             else
                                 RenderBGScanlineWin(bgnum, scanline.bgcnts[bgnum], bghoffs, bgvoffs, vcount, pixels, &scanline, windowsEnabled);
                             
@@ -2742,6 +2841,8 @@ void DrawFrame(uint16_t *pixels)
 {
     int i;
     int j;
+
+    BuildSpriteLists();
     
     //memsetu16(pixels, *(uint16_t *)PLTT, DISPLAY_WIDTH * DISPLAY_HEIGHT);
 

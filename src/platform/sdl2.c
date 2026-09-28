@@ -127,6 +127,8 @@ static unsigned long sMaxFrames = 0;
 static unsigned long sDumpEvery = 0;
 static unsigned long sBattleFrame = 0;
 extern void Harness_StartTestBattle(void);
+extern void Harness_EnableFollower(void);
+static unsigned long sFollowFrame = 0;
 static const char *sDumpList = NULL;
 static const char *sInputScript = NULL;
 static uint16_t sFrameImage[DISPLAY_WIDTH * DISPLAY_HEIGHT];
@@ -301,6 +303,8 @@ static void InitTestHarness(void)
     if ((v = getenv("ROGUE_DUMPEVERY")) != NULL)
         sDumpEvery = strtoul(v, NULL, 10);
     sDumpList = getenv("ROGUE_DUMP");
+    if ((v = getenv("ROGUE_FOLLOW")) != NULL)
+        sFollowFrame = strtoul(v, NULL, 10);
     if ((v = getenv("ROGUE_BATTLE")) != NULL)
         sBattleFrame = strtoul(v, NULL, 10);
     sPerfLog = (v = getenv("ROGUE_PERFLOG")) != NULL && *v == '1';
@@ -324,6 +328,8 @@ static bool RunGameFrame(bool draw)
     ENTER_VBLANK(); //you must be in VBlank before running a game tick
     if (sBattleFrame != 0 && sFrameCount == sBattleFrame)
         Harness_StartTestBattle();
+    if (sFollowFrame != 0 && sFrameCount == sFollowFrame)
+        Harness_EnableFollower();
     MainLoop();
     if (sPerfLog)
         t1 = NowMs();
@@ -371,11 +377,12 @@ int main(int argc, char **argv)
     sceIoMkdir("ux0:data", 0777);
     sceIoMkdir(DATA_DIR, 0777);
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
-    PlatformLog("pokeemerald_rogue starting\n");
+    PlatformLog("pokeemerald_rogue starting (cpu %d MHz, bus %d MHz, gpu %d MHz)\n",
+                scePowerGetArmClockFrequency(), scePowerGetBusClockFrequency(), scePowerGetGpuClockFrequency());
 #endif
 
     InitTestHarness();
-    ReadSaveFile(SAVE_PATH);
+    ReadSaveFile(getenv("ROGUE_SAVEFILE") != NULL ? (char *)getenv("ROGUE_SAVEFILE") : SAVE_PATH);
 
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0)
     {
@@ -496,10 +503,17 @@ int main(int argc, char **argv)
             //samples per frame is 701, that gets multipled by two when being queued and then multipled by four because samples are float32 which are 4 bytes long hence the divide by 8
             //this number is then checked against samples per frame multipled by three rounded down to 2000 to give it enough margin of error while not desyncing
             //this is all done to sync audio to gameplay
-            if (SDL_GetQueuedAudioSize(1)/8 < 2000)
+            // Keep the audio queue topped up independently of the video frame rate:
+            // if a frame runs late (e.g. a slow Vita scene) we mix extra audio frames
+            // instead of letting playback run dry, which sounds choppy.
             {
                 double ta = sPerfLog ? NowMs() : 0;
-                AudioUpdate();
+                int mixed = 0;
+                while (SDL_GetQueuedAudioSize(1)/8 < 2000 && mixed < 4)
+                {
+                    AudioUpdate();
+                    mixed++;
+                }
                 if (sPerfLog)
                     sPerfAudio += NowMs() - ta;
             }
