@@ -6451,7 +6451,9 @@ void RemoveMonAtSlot(u8 slot, bool8 keepItems, bool8 compactPartySlots)
 
 #ifdef ROGUE_EXPANSION
             // avoid reverting into this species
-            gBattleStruct->changedSpecies[B_SIDE_PLAYER][slot] = SPECIES_NONE;
+            // gBattleStruct is freed once the battle has ended (GBA writes to NULL are ignored)
+            if (gBattleStruct != NULL)
+                gBattleStruct->changedSpecies[B_SIDE_PLAYER][slot] = SPECIES_NONE;
 #endif
 
             if(compactPartySlots)
@@ -6570,7 +6572,9 @@ void RemoveAnyFaintedMons(bool8 keepItems)
 
 #ifdef ROGUE_EXPANSION
                 // avoid reverting into this species
-                gBattleStruct->changedSpecies[B_SIDE_PLAYER][read] = SPECIES_NONE;
+                // gBattleStruct is freed once the battle has ended (GBA writes to NULL are ignored)
+                if (gBattleStruct != NULL)
+                    gBattleStruct->changedSpecies[B_SIDE_PLAYER][read] = SPECIES_NONE;
 #endif
             }
         }
