@@ -432,6 +432,34 @@ void Platform_ReadFlash(u16 sectorNum, u32 offset, u8 *dest, u32 size)
 
 void Platform_QueueAudio(float *audioBuffer, s32 samplesPerFrame)
 {
+    static FILE *sRawAudio = NULL;
+    static bool sRawAudioChecked = false;
+    static float sPrevIn[2], sPrevOut[2];
+    int count = samplesPerFrame / sizeof(float);
+
+    // DC blocking high-pass filter, like the capacitor on the GBA's audio output.
+    // Without it, CGB channels left at a non-zero level cause pops.
+    for (int i = 0; i < count; i++)
+    {
+        int ch = i & 1;
+        float in = audioBuffer[i];
+        float out = in - sPrevIn[ch] + 0.9995f * sPrevOut[ch];
+        sPrevIn[ch] = in;
+        sPrevOut[ch] = out;
+        audioBuffer[i] = out;
+    }
+
+    // ROGUE_RAWAUDIO=path dumps the mixer output (float32 stereo) for testing
+    if (!sRawAudioChecked)
+    {
+        const char *path = getenv("ROGUE_RAWAUDIO");
+        sRawAudioChecked = true;
+        if (path != NULL)
+            sRawAudio = fopen(path, "wb");
+    }
+    if (sRawAudio != NULL)
+        fwrite(audioBuffer, 1, samplesPerFrame, sRawAudio);
+
     SDL_QueueAudio(1, audioBuffer, samplesPerFrame);
 }
 

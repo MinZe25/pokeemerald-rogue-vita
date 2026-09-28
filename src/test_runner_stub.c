@@ -1,7 +1,9 @@
 #include "global.h"
 #include "test_runner.h"
 
+#ifndef PORTABLE
 __attribute__((weak))
+#endif
 const bool8 gTestRunnerEnabled = FALSE;
 
 // The Makefile patches gTestRunnerHeadless as part of make test.

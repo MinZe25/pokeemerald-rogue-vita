@@ -288,8 +288,14 @@ PERL := perl
 ASMFILTER := python3 tools/pc/asmfilter.py
 ifeq ($(PORTABLE),1)
 ASM_TO_HOST := | $(ASMFILTER) -
+ifeq ($(TARGET_OS),WINDOWS)
+DATA_AS := bash tools/pc/as_data.sh "$(AS)" $(OBJCOPY) 1
+else
+DATA_AS := $(AS)
+endif
 else
 ASM_TO_HOST :=
+DATA_AS := $(AS)
 endif
 
 # Inclusive list. If you don't want a tool to be built, don't add it here.
@@ -570,11 +576,11 @@ endif
 
 ifeq ($(NODEP),1)
 $(C_BUILDDIR)/%.o: $(C_SUBDIR)/%.s
-	$(PREPROC) $< charmap.txt | $(CPP) -I include - $(ASM_TO_HOST) | $(AS) $(ASFLAGS) -o $@
+	$(PREPROC) $< charmap.txt | $(CPP) -I include - $(ASM_TO_HOST) | $(DATA_AS) $(ASFLAGS) -o $@
 else
 define SRC_ASM_DATA_DEP
 $1: $2 $$(shell $(SCANINC) -I include -I "" $2)
-	$$(PREPROC) $$< charmap.txt | $$(CPP) -I include - $$(ASM_TO_HOST) | $$(AS) $$(ASFLAGS) -o $$@
+	$$(PREPROC) $$< charmap.txt | $$(CPP) -I include - $$(ASM_TO_HOST) | $$(DATA_AS) $$(ASFLAGS) -o $$@
 endef
 $(foreach src, $(C_ASM_SRCS), $(eval $(call SRC_ASM_DATA_DEP,$(patsubst $(C_SUBDIR)/%.s,$(C_BUILDDIR)/%.o, $(src)),$(src))))
 endif
@@ -592,7 +598,7 @@ endif
 
 ifeq ($(NODEP),1)
 $(DATA_ASM_BUILDDIR)/%.o: $(DATA_ASM_SUBDIR)/%.s
-	$(PREPROC) $< charmap.txt | $(CPP) -I include - $(ASM_TO_HOST) | $(AS) $(ASFLAGS) -o $@
+	$(PREPROC) $< charmap.txt | $(CPP) -I include - $(ASM_TO_HOST) | $(DATA_AS) $(ASFLAGS) -o $@
 else
 $(foreach src, $(REGULAR_DATA_ASM_SRCS), $(eval $(call SRC_ASM_DATA_DEP,$(patsubst $(DATA_ASM_SUBDIR)/%.s,$(DATA_ASM_BUILDDIR)/%.o, $(src)),$(src))))
 endif
@@ -600,7 +606,7 @@ endif
 
 ifeq ($(PORTABLE),1)
 $(SONG_BUILDDIR)/%.o: $(SONG_SUBDIR)/%.s
-	$(ASMFILTER) $< | $(AS) $(ASFLAGS) -o $@ -
+	$(ASMFILTER) $< | $(DATA_AS) $(ASFLAGS) -o $@ -
 else
 $(SONG_BUILDDIR)/%.o: $(SONG_SUBDIR)/%.s
 	$(AS) $(ASFLAGS) -I sound -o $@ $<
@@ -636,7 +642,7 @@ $(OBJ_DIR)/ld_script.ld: $(LD_SCRIPT) $(LD_SCRIPT_DEPS)
 
 ifeq ($(PORTABLE),1)
 ifeq ($(TARGET_OS),WINDOWS)
-PC_LIBS := -L$(SDL_DIR)/lib -lmingw32 -lSDL2main -lSDL2 -lm -lwinmm -lxinput -mconsole -static-libgcc
+PC_LIBS := -L$(SDL_DIR)/lib -lmingw32 -lSDL2main -lSDL2 -lm -lwinmm -lxinput9_1_0 -mconsole -static-libgcc
 else
 PC_LIBS := -lSDL2 -lm -no-pie
 endif

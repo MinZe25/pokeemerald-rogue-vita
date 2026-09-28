@@ -2,7 +2,7 @@ STD_REVERB = 50
 
 ifeq ($(PORTABLE),1)
 $(MID_BUILDDIR)/%.o: $(MID_SUBDIR)/%.s
-	$(ASMFILTER) $< | $(AS) $(ASFLAGS) -o $@ -
+	$(ASMFILTER) $< | $(DATA_AS) $(ASFLAGS) -o $@ -
 else
 $(MID_BUILDDIR)/%.o: $(MID_SUBDIR)/%.s
 	$(AS) $(ASFLAGS) -I sound -o $@ $<

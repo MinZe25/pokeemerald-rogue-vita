@@ -1,7 +1,11 @@
 #include "global.h"
 #include "random.h"
 #if MODERN
+#ifdef _WIN32
+#include <malloc.h>
+#else
 #include <alloca.h>
+#endif
 #endif
 
 #ifdef ROGUE_FEATURE_HQ_RANDOM
@@ -170,6 +174,33 @@ void ShuffleN(void *data, size_t n, size_t size)
     }
 }
 
+#ifdef PORTABLE
+// Weak aliases aren't reliable on PE/COFF; the tests that override these don't run on PC.
+u32 RandomUniformDefault(enum RandomTag tag, u32 lo, u32 hi);
+u32 RandomUniformExceptDefault(enum RandomTag, u32 lo, u32 hi, bool32 (*reject)(u32));
+u32 RandomWeightedArrayDefault(enum RandomTag tag, u32 sum, u32 n, const u8 *weights);
+const void *RandomElementArrayDefault(enum RandomTag tag, const void *array, size_t size, size_t count);
+
+u32 RandomUniform(enum RandomTag tag, u32 lo, u32 hi)
+{
+    return RandomUniformDefault(tag, lo, hi);
+}
+
+u32 RandomUniformExcept(enum RandomTag tag, u32 lo, u32 hi, bool32 (*reject)(u32))
+{
+    return RandomUniformExceptDefault(tag, lo, hi, reject);
+}
+
+u32 RandomWeightedArray(enum RandomTag tag, u32 sum, u32 n, const u8 *weights)
+{
+    return RandomWeightedArrayDefault(tag, sum, n, weights);
+}
+
+const void *RandomElementArray(enum RandomTag tag, const void *array, size_t size, size_t count)
+{
+    return RandomElementArrayDefault(tag, array, size, count);
+}
+#else
 __attribute__((weak, alias("RandomUniformDefault")))
 u32 RandomUniform(enum RandomTag tag, u32 lo, u32 hi);
 
@@ -181,6 +212,7 @@ u32 RandomWeightedArray(enum RandomTag tag, u32 sum, u32 n, const u8 *weights);
 
 __attribute__((weak, alias("RandomElementArrayDefault")))
 const void *RandomElementArray(enum RandomTag tag, const void *array, size_t size, size_t count);
+#endif
 
 u32 RandomUniformDefault(enum RandomTag tag, u32 lo, u32 hi)
 {
