@@ -301,7 +301,7 @@ void MovementType_Player(struct Sprite *sprite)
     //Rogue_OnMovementType_Player(sprite);
 }
 
-static bool8 ObjectEventCB2_NoMovement2(struct ObjectEvent *, struct Sprite *)
+static bool8 ObjectEventCB2_NoMovement2(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     return 0;
 }

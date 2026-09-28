@@ -1,5 +1,5 @@
 #include "global.h"
 
-void PlaySlotMachine(u8, void (callback)(void))
+void PlaySlotMachine(u8 machineId, void (callback)(void))
 {
 }

@@ -1821,7 +1821,13 @@ void SetPokemonCryProgress(u32 val)
 
 bool32 IsPokemonCryPlaying(struct MusicPlayerInfo *mplayInfo)
 {
-    struct MusicPlayerTrack *track = mplayInfo->tracks;
+    struct MusicPlayerTrack *track;
+
+#ifdef PORTABLE
+    if (mplayInfo == NULL) // no cry has been played yet
+        return FALSE;
+#endif
+    track = mplayInfo->tracks;
 
 #if defined PORTABLE && !defined SOUND_DISABLED
     if (!mplayInfo->hasBeenRanOnce)
