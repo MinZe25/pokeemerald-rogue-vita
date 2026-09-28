@@ -4267,7 +4267,11 @@ static void AdjustBgTilemapForFooter(void)
 static void DrawLowerWindow(void)
 {
     PutWindowTilemap(WIN_INPUT_SELECT);
+#ifdef PORTABLE
+    CopyWindowToVram(WIN_INPUT_SELECT, COPYWIN_FULL);
+#else
     CopyBgTilemapBufferToVram(WIN_INPUT_SELECT);
+#endif
 }
 
 static void InitLowerWindowText(u32 whichText)

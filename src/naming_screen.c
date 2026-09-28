@@ -698,10 +698,17 @@ static bool8 MainState_Exit(void)
 {
     if (!gPaletteFade.active)
     {
+#ifndef PORTABLE // See note on TID generation in InitPlayerTrainerId in new_game.c
         if (sNamingScreen->templateNum == NAMING_SCREEN_PLAYER)
             SeedRngAndSetTrainerId();
+#endif
         SetMainCallback2(sNamingScreen->returnCallback);
         DestroyTask(FindTaskIdByFunc(Task_NamingScreen));
+#ifdef PORTABLE
+        ResetVHBlank();
+        // Fix use-after-free issues with gNamingScreenData caused by sprites calling their callbacks which attempt to read from gNamingScreenData.
+        ResetSpriteData();
+#endif
         FreeAllWindowBuffers();
         FREE_AND_SET_NULL(sNamingScreen);
     }

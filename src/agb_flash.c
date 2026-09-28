@@ -1,5 +1,7 @@
+#include "global.h"
 #include "gba/gba.h"
 #include "gba/flash_internal.h"
+#include "platform.h"
 
 static u8 sTimerNum;
 static u16 sTimerCount;
@@ -36,6 +38,9 @@ do {                             \
 
 u16 ReadFlashId(void)
 {
+#ifdef PORTABLE
+    return 0xCCCC;
+#else
     u16 flashId;
     u16 readFlash1Buffer[0x20];
     u8 (*readFlash1)(u8 *);
@@ -60,6 +65,7 @@ u16 ReadFlashId(void)
     DELAY();
 
     return flashId;
+#endif
 }
 
 void FlashTimerIntr(void)
@@ -110,6 +116,7 @@ u8 ReadFlash1(u8 *addr)
 
 void SetReadFlash1(u16 *dest)
 {
+    #ifndef PORTABLE
     u16 *src;
     u16 i;
 
@@ -125,6 +132,7 @@ void SetReadFlash1(u16 *dest)
         *dest++ = *src++;
         i--;
     }
+    #endif
 }
 
 // Using volatile here to make sure the flash memory will ONLY be read as bytes, to prevent any compiler optimizations.
@@ -138,6 +146,10 @@ void ReadFlash_Core(vu8 *src, u8 *dest, u32 size)
 
 void ReadFlash(u16 sectorNum, u32 offset, u8 *dest, u32 size)
 {
+#ifdef PORTABLE
+    Platform_ReadFlash(sectorNum, offset, dest, size);
+    return;
+#else
     u8 *src;
     u16 i;
     vu16 readFlash_Core_Buffer[0x40];
@@ -170,10 +182,14 @@ void ReadFlash(u16 sectorNum, u32 offset, u8 *dest, u32 size)
     src = FLASH_BASE + (sectorNum << gFlash->sector.shift) + offset;
 
     readFlash_Core(src, dest, size);
+#endif
 }
 
 u32 VerifyFlashSector_Core(u8 *src, u8 *tgt, u32 size)
 {
+#ifdef PORTABLE
+    return 0;
+#else
     while (size-- != 0)
     {
         if (*tgt++ != *src++)
@@ -181,8 +197,10 @@ u32 VerifyFlashSector_Core(u8 *src, u8 *tgt, u32 size)
     }
 
     return 0;
+#endif
 }
 
+#ifndef PORTABLE
 u32 VerifyFlashSector(u16 sectorNum, u8 *src)
 {
     u16 i;
@@ -220,7 +238,11 @@ u32 VerifyFlashSector(u16 sectorNum, u8 *src)
 
     return verifyFlashSector_Core(src, tgt, size);
 }
+#else
+u32 VerifyFlashSector(u16 sectorNum, u8 *src);
+#endif
 
+#ifndef PORTABLE
 u32 VerifyFlashSectorNBytes(u16 sectorNum, u8 *src, u32 n)
 {
     u16 i;
@@ -256,6 +278,9 @@ u32 VerifyFlashSectorNBytes(u16 sectorNum, u8 *src, u32 n)
 
     return verifyFlashSector_Core(src, tgt, n);
 }
+#else
+u32 VerifyFlashSectorNBytes(u16 sectorNum, u8 *src, u32 n);
+#endif
 
 u32 ProgramFlashSectorAndVerify(u16 sectorNum, u8 *src)
 {

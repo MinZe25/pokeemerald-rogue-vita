@@ -921,11 +921,13 @@ static void Task_TitleScreenPhase3(u8 taskId)
         if(sMusicVariant[gTasks[taskId].tMusicVariant].songNum != MUS_NONE)
         {
             // Restart when music stops
+#ifndef PORTABLE
             if ((gMPlayInfo_BGM.status & 0xFFFF) == 0)
             {
                 BeginNormalPaletteFade(PALETTES_ALL, 0, 0, 0x10, RGB_WHITEALPHA);
                 SetMainCallback2(CB2_GoToCopyrightScreen);
             }
+#endif
         }
     }
 }

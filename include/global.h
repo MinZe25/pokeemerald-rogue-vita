@@ -1,8 +1,16 @@
 #ifndef GUARD_GLOBAL_H
 #define GUARD_GLOBAL_H
 
+#include <stdio.h>
 #include <string.h>
 #include <limits.h>
+
+#if !defined NO_STD_LIB_ENABLED && defined PORTABLE && defined PC_VERBOSE
+    #define DBGPRINTF(...) printf(__VA_ARGS__)
+#else
+    #define DBGPRINTF(...)
+#endif
+
 #include "config.h" // we need to define config before gba headers as print stuff needs the functions nulled before defines.
 #include "gba/gba.h"
 #include "fpmath.h"

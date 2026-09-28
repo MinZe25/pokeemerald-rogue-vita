@@ -1,4 +1,5 @@
 #include "global.h"
+#include "platform.h"
 #include "agb_flash.h"
 #include "gba/flash_internal.h"
 #include "fieldmap.h"
@@ -784,6 +785,9 @@ u8 TrySavingData(u8 saveType)
     HandleSavingData(saveType);
     if (!gDamagedSaveSectors)
     {
+#ifdef PORTABLE
+		Platform_StoreSaveFile();
+#endif
         gSaveAttemptStatus = SAVE_STATUS_OK;
         return SAVE_STATUS_OK;
     }

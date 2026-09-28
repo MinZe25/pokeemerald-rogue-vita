@@ -46,4 +46,7 @@ data/maps/**/*.inc
 tools/poryscript/*
 tools/ups/*
 !tools/Pokabbie/Build
-pokeemerald-*.png
+pokeemerald-*.png/pokeemerald_rogue
+/pokeemerald_rogue.exe
+/SDL2/
+*.sav

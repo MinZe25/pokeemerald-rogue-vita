@@ -11,6 +11,7 @@
 #include "text_window.h"
 #include "constants/songs.h"
 #include "constants/rgb.h"
+#include "platform.h"
 
 extern const u8 gText_ClearAllSaveData[];
 extern const u8 gText_ClearingData[];
@@ -105,6 +106,12 @@ static void Task_ClearSaveDataScreenYesNoChoice(u8 taskId)
 static void Task_ClearSaveData(u8 taskId)
 {
     ClearSaveData();
+
+#ifdef PORTABLE
+	// Calling Platform_StoreSaveFile here to guarantee it is properly erased
+	Platform_StoreSaveFile();
+#endif
+
     DestroyTask(taskId);
     SetMainCallback2(CB2_FadeAndDoReset);
 }

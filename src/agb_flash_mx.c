@@ -1,5 +1,10 @@
+#include "global.h"
 #include "gba/gba.h"
 #include "gba/flash_internal.h"
+
+#ifdef PORTABLE
+extern unsigned char REG_BASE[0x400] __attribute__((aligned(4)));
+#endif
 
 const u16 mxMaxTime[] =
 {

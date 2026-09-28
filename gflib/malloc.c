@@ -227,5 +227,9 @@ const char *MemBlockLocation(const struct MemBlock *block)
     if (!block->allocated)
         return NULL;
 
+#ifdef PORTABLE
+    return NULL;
+#else
     return (const char *)(ROM_START | (block->locationHi << 14) | block->locationLo);
+#endif
 }
