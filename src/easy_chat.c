@@ -5169,7 +5169,8 @@ static void AddMainScreenButtonWindow(void)
 
 static bool8 IsEasyChatGroupVisible(u8 groupId)
 {
-    if(sEasyChatScreen->type == EASY_CHAT_TYPE_ROGUE_GAMESHOW_CHOOSE_MON)
+    // sEasyChatScreen is NULL when called from outside the easy chat screen (e.g. the trainer card)
+    if(sEasyChatScreen != NULL && sEasyChatScreen->type == EASY_CHAT_TYPE_ROGUE_GAMESHOW_CHOOSE_MON)
     {
         switch (groupId)
         {
