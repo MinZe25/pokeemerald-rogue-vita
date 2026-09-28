@@ -162,7 +162,7 @@ struct SoundChannel
     u8 rhythmPan;
     u8 dummy3[3];
     u32 count;
-    u32 fw;
+    sampleTyping fw; // float on PORTABLE: the C mixer keeps a fractional position here
     u32 frequency;
     struct WaveData *wav;
     s8 *currentPointer;
@@ -218,7 +218,7 @@ struct SoundInfo
     u8 gap[3];
     s32 pcmSamplesPerVBlank;
     s32 pcmFreq;
-    s32 divFreq;
+    sampleTyping divFreq; // float on PORTABLE: read by the C mixer as sampleRateReciprocal
     struct CgbChannel *cgbChans;
     MPlayMainFunc MPlayMainHead;
     struct MusicPlayerInfo *musicPlayerHead;

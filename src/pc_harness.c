@@ -40,3 +40,36 @@ void Harness_EnableFollower(void)
     SetupFollowParterMonObjectEvent();
 }
 #endif
+
+#ifdef PORTABLE
+#include "sound.h"
+#include "m4a.h"
+#include <stdio.h>
+
+// Plays a cry and a series of sound effects at fixed frame offsets
+void Harness_SoundTestFrame(unsigned long t)
+{
+    static bool8 sCryWasPlaying = FALSE;
+
+    if (t == 0)
+        m4aMPlayAllStop();
+    if (t == 30)
+    {
+        PlayCry_Normal(SPECIES_PIKACHU, 0);
+        sCryWasPlaying = TRUE;
+        printf("SOUNDTEST cry start t=%lu\n", t);
+    }
+    if (t > 30 && t < 400 && sCryWasPlaying && !IsCryPlaying())
+    {
+        sCryWasPlaying = FALSE;
+        printf("SOUNDTEST cry finished t=%lu (IsCryPlaying false)\n", t);
+    }
+    if (t >= 400 && t < 400 + 40 * 300 && (t - 400) % 40 == 0)
+    {
+        u16 se = 1 + (t - 400) / 40;
+        m4aMPlayAllStop(); // isolate each effect (priorities would otherwise reject some)
+        PlaySE(se);
+        printf("SOUNDTEST se %u t=%lu\n", se, t);
+    }
+}
+#endif

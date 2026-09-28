@@ -128,6 +128,8 @@ static unsigned long sDumpEvery = 0;
 static unsigned long sBattleFrame = 0;
 extern void Harness_StartTestBattle(void);
 extern void Harness_EnableFollower(void);
+extern void Harness_SoundTestFrame(unsigned long t);
+static unsigned long sSoundTestFrame = 0;
 static unsigned long sFollowFrame = 0;
 static const char *sDumpList = NULL;
 static const char *sInputScript = NULL;
@@ -303,6 +305,8 @@ static void InitTestHarness(void)
     if ((v = getenv("ROGUE_DUMPEVERY")) != NULL)
         sDumpEvery = strtoul(v, NULL, 10);
     sDumpList = getenv("ROGUE_DUMP");
+    if ((v = getenv("ROGUE_SOUNDTEST")) != NULL)
+        sSoundTestFrame = strtoul(v, NULL, 10);
     if ((v = getenv("ROGUE_FOLLOW")) != NULL)
         sFollowFrame = strtoul(v, NULL, 10);
     if ((v = getenv("ROGUE_BATTLE")) != NULL)
@@ -328,6 +332,8 @@ static bool RunGameFrame(bool draw)
     ENTER_VBLANK(); //you must be in VBlank before running a game tick
     if (sBattleFrame != 0 && sFrameCount == sBattleFrame)
         Harness_StartTestBattle();
+    if (sSoundTestFrame != 0 && sFrameCount >= sSoundTestFrame)
+        Harness_SoundTestFrame(sFrameCount - sSoundTestFrame);
     if (sFollowFrame != 0 && sFrameCount == sFollowFrame)
         Harness_EnableFollower();
     MainLoop();
