@@ -1171,7 +1171,7 @@ void SetFollowerSprite(u8 spriteIndex)
     DestroySprite(&gSprites[oldSpriteId]);
     RemoveObjectEvent(&gObjectEvents[GetFollowerMapObjId()]);
 
-    clone = *GetObjectEventTemplateByLocalIdAndMap(gSaveBlock2Ptr->follower.map.id, gSaveBlock2Ptr->follower.map.number, gSaveBlock2Ptr->follower.map.group);
+    clone = *GetObjectEventTemplateByLocalIdAndMapSafe(gSaveBlock2Ptr->follower.map.id, gSaveBlock2Ptr->follower.map.number, gSaveBlock2Ptr->follower.map.group);
     clone.graphicsId = newGraphicsId;
     //clone.graphicsIdUpperByte = newGraphicsId >> 8;
     gSaveBlock2Ptr->follower.objId = TrySpawnObjectEventTemplate(&clone, gSaveBlock1Ptr->location.mapNum, gSaveBlock1Ptr->location.mapGroup, clone.x, clone.y);
@@ -1215,7 +1215,7 @@ void CreateFollowerAvatar(void)
         return;
 
     player = &gObjectEvents[gPlayerAvatar.objectEventId];
-    clone = *GetObjectEventTemplateByLocalIdAndMap(gSaveBlock2Ptr->follower.map.id, gSaveBlock2Ptr->follower.map.number, gSaveBlock2Ptr->follower.map.group);
+    clone = *GetObjectEventTemplateByLocalIdAndMapSafe(gSaveBlock2Ptr->follower.map.id, gSaveBlock2Ptr->follower.map.number, gSaveBlock2Ptr->follower.map.group);
 
     clone.localId = gSaveBlock2Ptr->follower.map.id; // if fail to get template, can stomp over otherwise valid NPC
     clone.graphicsId = GetFollowerSprite();
@@ -1274,7 +1274,7 @@ static void TurnNPCIntoFollower(u8 localId, u16 followerFlags)
             //else
             //    script = GetObjectEventScriptPointerByObjectEventId(eventObjId);
             
-            flag = GetObjectEventTemplateByLocalIdAndMap(follower->localId, follower->mapNum, follower->mapGroup)->flagId;
+            flag = GetObjectEventTemplateByLocalIdAndMapSafe(follower->localId, follower->mapNum, follower->mapGroup)->flagId;
             gSaveBlock2Ptr->follower.inProgress = TRUE;
             gSaveBlock2Ptr->follower.objId = eventObjId;
             gSaveBlock2Ptr->follower.graphicsId = follower->graphicsId;

@@ -200,7 +200,9 @@ static const struct WindowTemplate sRoguePlayerUIWindowTemplates[] =
         .height = 18,
         .paletteNum = 15,
         .baseBlock = 1 + (13 * 2),
-    }
+    },
+    // InitWindows reads until it finds this terminator
+    DUMMY_WIN_TEMPLATE
 };
 
 static const struct RoguePlayerUIEntry sRoguePlayerUIEntries[UI_ENTRY_COUNT] = 

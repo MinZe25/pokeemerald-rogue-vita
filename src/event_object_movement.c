@@ -3097,7 +3097,7 @@ static const u8 *GetObjectEventScriptPointerByLocalIdAndMap(u8 localId, u8 mapNu
         return Rogue_InteractWithDynamicWildFollowMon;
     }
 
-    return GetObjectEventTemplateByLocalIdAndMap(localId, mapNum, mapGroup)->script;
+    return GetObjectEventTemplateByLocalIdAndMapSafe(localId, mapNum, mapGroup)->script;
 }
 
 const u8 *GetObjectEventScriptPointerByObjectEventId(u8 objectEventId)
@@ -3150,6 +3150,21 @@ u8 GetObjectEventBerryTreeIdByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup)
 u8 GetObjectEventBerryTreeId(u8 objectEventId)
 {
     return gObjectEvents[objectEventId].trainerRange_berryTreeId;
+}
+
+// Same as GetObjectEventTemplateByLocalIdAndMap, but for callers that dereference
+// the result without checking. Spawned objects (e.g. the follow mon) have no
+// template; on GBA reading through NULL returns BIOS data instead of crashing.
+const struct ObjectEventTemplate *GetObjectEventTemplateByLocalIdAndMapSafe(u8 localId, u8 mapNum, u8 mapGroup)
+{
+    const struct ObjectEventTemplate *template = GetObjectEventTemplateByLocalIdAndMap(localId, mapNum, mapGroup);
+#ifdef PORTABLE
+    static const struct ObjectEventTemplate sDummyTemplate = {0};
+
+    if (template == NULL)
+        return &sDummyTemplate;
+#endif
+    return template;
 }
 
 const struct ObjectEventTemplate *GetObjectEventTemplateByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup)
