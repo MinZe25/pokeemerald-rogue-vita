@@ -31,6 +31,9 @@
 #include "constants/rgb.h"
 #include "constants/trainers.h"
 #include "constants/union_room.h"
+#ifdef PORTABLE
+#include "menu_helpers.h"
+#endif
 
 
 #include "rogue_campaign.h"
@@ -389,6 +392,9 @@ static void CloseTrainerCard(u8 taskId)
     FreeAllWindowBuffers();
     FREE_AND_SET_NULL(sData);
     DestroyTask(taskId);
+#ifdef PORTABLE
+    SetVBlankHBlankCallbacksToNull(); // UB: fixes use after free of sData in VBlank callback
+#endif
 }
 
 // States for Task_TrainerCard. Skips the initial states, which are done once in order

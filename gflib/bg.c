@@ -3,6 +3,9 @@
 #include "bg.h"
 #include "dma3.h"
 #include "gpu_regs.h"
+#ifdef PORTABLE
+#include "platform/system.h"
+#endif
 
 #define DISPCNT_ALL_BG_AND_MODE_BITS    (DISPCNT_BG_ALL_ON | 0x7)
 
@@ -444,6 +447,10 @@ bool8 IsDma3ManagerBusyWithBgCopy(void)
 {
     int i;
 
+#ifdef PORTABLE
+	RunDMAsAndVBlank();
+    return FALSE;
+#endif
     for (i = 0; i < 0x80; i++)
     {
         u8 div = i / 0x20;
@@ -1241,10 +1248,9 @@ bool32 IsInvalidBg32(u8 bg)
 
 bool32 IsTileMapOutsideWram(u8 bg)
 {
+#ifndef PORTABLE
     if (sGpuBgConfigs2[bg].tilemap > (void *)IWRAM_END)
         return TRUE;
-    else if (sGpuBgConfigs2[bg].tilemap == NULL)
-        return TRUE;
-    else
-        return FALSE;
+#endif
+    return sGpuBgConfigs2[bg].tilemap == NULL;
 }

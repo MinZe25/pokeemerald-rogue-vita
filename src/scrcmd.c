@@ -371,7 +371,11 @@ bool8 ScrCmd_setvar(struct ScriptContext *ctx)
 bool8 ScrCmd_copyvar(struct ScriptContext *ctx)
 {
     u16 *ptr = GetVarPointer(ScriptReadHalfword(ctx));
+#ifndef PORTABLE
     *ptr = *GetVarPointer(ScriptReadHalfword(ctx));
+#else // GF incorrectly uses this in a few places, leading to dereferincing NULL pointers
+    *ptr = VarGet(ScriptReadHalfword(ctx));
+#endif
     return FALSE;
 }
 

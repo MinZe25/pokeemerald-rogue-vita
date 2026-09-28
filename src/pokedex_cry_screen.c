@@ -29,6 +29,12 @@
 
 #define TAG_NEEDLE 0x2000
 
+#ifdef PORTABLE
+    typedef float SampleDataType;
+#else
+    typedef u8 SampleDataType;
+#endif
+
 struct PokedexCryMeterNeedle {
     s8 rotation;
     s8 targetRotation;

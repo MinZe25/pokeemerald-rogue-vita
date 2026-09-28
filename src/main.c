@@ -26,6 +26,7 @@
 #include "main.h"
 #include "trainer_hill.h"
 #include "test_runner.h"
+#include "platform.h"
 #include "constants/rgb.h"
 
 #include "rogue_controller.h"
@@ -39,7 +40,11 @@ static void SerialIntr(void);
 static void IntrDummy(void);
 
 // Defined in the linker script so that the test build can override it.
+#ifdef PORTABLE
+#define gInitialMainCB2 CB2_InitCopyrightScreenAfterBootup
+#else
 extern void gInitialMainCB2(void);
+#endif
 
 const u8 gGameVersion = GAME_VERSION;
 
@@ -101,6 +106,9 @@ void AgbMain()
 #if !MODERN
     RegisterRamReset(RESET_ALL);
 #endif //MODERN
+#ifdef PORTABLE
+    REG_VCOUNT = 161; // prep for being in VBlank period
+#endif
     *(vu16 *)BG_PLTT = RGB_WHITE; // Set the backdrop to white on startup
     InitGpuRegManager();
     REG_WAITCNT = WAITCNT_PREFETCH_ENABLE | WAITCNT_WS0_S_1 | WAITCNT_WS0_N_3;
@@ -108,7 +116,9 @@ void AgbMain()
     InitIntrHandlers();
     m4aSoundInit();
     EnableVCountIntrAtLine150();
+#ifndef PORTABLE
     InitRFU();
+#endif
     RtcInit();
     CheckForFlashMemory();
     InitMainCallbacks();
@@ -123,6 +133,10 @@ void AgbMain()
     InitHeap(gHeap, HEAP_SIZE);
 
     gMain.nativeSpeedUpActive = FALSE;
+#ifdef PORTABLE
+    gMain.isInaccurateEmulator = FALSE;
+    gSoftResetDisabled = FALSE;
+#else
     gMain.isInaccurateEmulator = IsInaccurateEmulator();
     gSoftResetDisabled = FALSE;
 
@@ -130,6 +144,7 @@ void AgbMain()
         RunEmulatorCheckUI(CB2_InitCopyrightScreenAfterBootup);
     else if (gFlashMemoryPresent != TRUE)
         SetMainCallback2(NULL);
+#endif
 
     gLinkTransferringData = FALSE;
     sUnusedVar = 0xFC0;
@@ -146,13 +161,23 @@ void AgbMain()
 
     Rogue_MainInit();
 
+#ifndef PORTABLE
     gAgbMainLoop_sp = __builtin_frame_address(0);
     AgbMainLoop();
+#endif
 }
 
 void AgbMainLoop(void)
 {
     for (;;)
+    {
+        MainLoop();
+    }
+}
+
+// PORTABLE: called once per frame by the platform layer
+void MainLoop(void)
+{
     {
         RogueDebug_ResetFrameTimers();
         START_TIMER(FRAME_TOTAL);
@@ -214,6 +239,10 @@ static void InitMainCallbacks(void)
     SetMainCallback2(gInitialMainCB2);
     gSaveBlock2Ptr = &gSaveblock2.block;
     gPokemonStoragePtr = &gPokemonStorage.block;
+#ifdef PORTABLE
+    // On GBA this is NULL until the intro runs and reads of it hit the BIOS region harmlessly
+    gSaveBlock1Ptr = &gSaveblock1.block;
+#endif
     RogueSave_UpdatePointers();
 }
 
@@ -313,7 +342,11 @@ void DebugForceReadKeys()
 
 static void ReadKeys(void)
 {
+#ifndef PORTABLE
     u16 keyInput = REG_KEYINPUT ^ KEYS_MASK;
+#else
+    u16 keyInput = Platform_GetKeyInput();
+#endif
     gMain.newKeysRaw = keyInput & ~gMain.heldKeysRaw;
     gMain.newKeys = gMain.newKeysRaw;
     gMain.newAndRepeatedKeys = gMain.newKeysRaw;
@@ -423,7 +456,9 @@ static void VBlankIntr(void)
 
     gPcmDmaCounter = gSoundInfo.pcmDmaCounter;
 
+#ifndef PORTABLE
     m4aSoundMain();
+#endif
     TryReceiveLinkBattleData();
 
     if (!gTestRunnerEnabled && (!gMain.inBattle || !(gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_FRONTIER | BATTLE_TYPE_RECORDED))))
@@ -454,7 +489,9 @@ static void VCountIntr(void)
     if (gMain.vcountCallback)
         gMain.vcountCallback();
 
+#ifndef PORTABLE
     m4aSoundVSync();
+#endif
     INTR_CHECK |= INTR_FLAG_VCOUNT;
     gMain.intrCheck |= INTR_FLAG_VCOUNT;
 }
@@ -473,8 +510,10 @@ static void IntrDummy(void)
 
 static void WaitForVBlank(void)
 {
+#ifndef PORTABLE
     gMain.intrCheck &= ~INTR_FLAG_VBLANK;
     VBlankIntrWait();
+#endif
 }
 
 void SetTrainerHillVBlankCounter(u32 *counter)

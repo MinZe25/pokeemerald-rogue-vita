@@ -3296,6 +3296,7 @@ void InitUnionRoom(void)
     sUnionRoomPlayerName[0] = EOS;
 }
 
+#ifndef PORTABLE
 static void Task_InitUnionRoom(u8 taskId)
 {
     s32 i;
@@ -3364,6 +3365,7 @@ static void Task_InitUnionRoom(u8 taskId)
         break;
     }
 }
+#endif
 
 bool16 BufferUnionRoomPlayerName(void)
 {

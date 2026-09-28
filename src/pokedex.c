@@ -2612,7 +2612,11 @@ static void UpdateSelectedMonSpriteId(void)
     {
         u16 spriteId = sPokedexView->monSpriteIds[i];
 
+#ifndef PORTABLE
         if (gSprites[spriteId].x2 == 0 && gSprites[spriteId].y2 == 0 && spriteId != 0xFFFF)
+#else
+        if (spriteId != 0xFFFF && gSprites[spriteId].x2 == 0 && gSprites[spriteId].y2 == 0)
+#endif
             sPokedexView->selectedMonSpriteId = spriteId;
     }
 }

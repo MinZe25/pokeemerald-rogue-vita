@@ -3826,6 +3826,10 @@ static void FreePokeStorageData(void)
     MultiMove_Free();
     FREE_AND_SET_NULL(sStorage);
     FreeAllWindowBuffers();
+#ifdef PORTABLE
+    ResetSpriteData(); // UB: sprites reference sStorage after free
+    SetVBlankHBlankCallbacksToNull(); // UB: VBlank also does
+#endif
 }
 
 
@@ -4206,6 +4210,10 @@ static void StopFlashingCloseBoxButton(void)
 
 static void UpdateCloseBoxButtonFlash(void)
 {
+#ifdef PORTABLE
+    if (sStorage == NULL) // UB: references sStorage after being freed
+        return;
+#endif
     if (sStorage->closeBoxFlashing && ++sStorage->closeBoxFlashTimer > 30)
     {
         sStorage->closeBoxFlashTimer = 0;
@@ -5125,7 +5133,12 @@ static bool8 ResetReleaseMonSpritePtr(void)
 
 static void SetMovingMonPriority(u8 priority)
 {
+#ifdef PORTABLE
+    if (sStorage->movingMonSprite != NULL) // UB: Used before being created
+        sStorage->movingMonSprite->oam.priority = priority;
+#else
     sStorage->movingMonSprite->oam.priority = priority;
+#endif
 }
 
 static void SpriteCB_HeldMon(struct Sprite *sprite)

@@ -10,7 +10,23 @@ struct PCG32 gRngValue;
 struct PCG32 gRng2Value;
 struct PCG32 gRngRogueValue;
 
+#ifdef PORTABLE
+// C port of src/random32.s (PCG32 by ax6)
+u32 RandomPCG32(struct PCG32* rng)
+{
+    u64 old = ((u64)rng->high << 32) | rng->low;
+    u64 addend = ((u64)rng->seed << 1) | 1;
+    u64 next = old * 0x5851f42d4c957f2dULL + addend;
+    u32 xorshifted = (u32)(((old >> 18) ^ old) >> 27);
+    u32 rot = (u32)(old >> 59);
+
+    rng->low = (u32)next;
+    rng->high = (u32)(next >> 32);
+    return (xorshifted >> rot) | (xorshifted << ((32 - rot) & 31));
+}
+#else
 u32 RandomPCG32(struct PCG32* rng);
+#endif
 
 u32 Random32(void)
 {

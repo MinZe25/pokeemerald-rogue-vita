@@ -78,9 +78,15 @@ static u8 TranslateBigMonSizeTableIndex(u16 a)
 
 static u32 GetMonSize(u16 species, u16 b)
 {
+#ifndef PORTABLE
     u64 unk2;
     u64 unk4;
     u64 unk0;
+#else
+    u32 unk2;
+    u32 unk4;
+    u32 unk0;
+#endif
     u32 height;
     u32 var;
 

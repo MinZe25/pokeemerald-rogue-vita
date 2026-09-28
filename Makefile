@@ -20,10 +20,28 @@ export PATH := $(TOOLCHAIN)/bin:$(PATH)
 endif
 endif
 
+# PC port: `make PORTABLE=1 TARGET_OS=LINUX` or `make PORTABLE=1 TARGET_OS=WINDOWS`
+PORTABLE ?= 0
+TARGET_OS ?= LINUX
+TARGET_PLATFORM ?= PLATFORM_SDL2
+TILE_RENDERER ?= RENDERER_EASY_DRAW
+
+ifeq ($(PORTABLE),1)
+ifeq ($(TARGET_OS),WINDOWS)
+PREFIX := i686-w64-mingw32-
+else
+PREFIX :=
+endif
+else
 PREFIX := arm-none-eabi-
+endif
 OBJCOPY := $(PREFIX)objcopy
 OBJDUMP := $(PREFIX)objdump
+ifeq ($(PORTABLE),1)
+AS := $(PREFIX)as --32
+else
 AS := $(PREFIX)as
+endif
 
 LD := $(PREFIX)ld
 
@@ -144,7 +162,11 @@ SONG_BUILDDIR = $(OBJ_DIR)/$(SONG_SUBDIR)
 MID_BUILDDIR = $(OBJ_DIR)/$(MID_SUBDIR)
 TEST_BUILDDIR = $(OBJ_DIR)/$(TEST_SUBDIR)
 
+ifeq ($(PORTABLE),1)
+ASFLAGS := --defsym MODERN=$(MODERN) --defsym PORTABLE=1 --defsym VER_64BIT=0
+else
 ASFLAGS := -mcpu=arm7tdmi --defsym MODERN=$(MODERN)
+endif
 
 ifeq ($(EXPANSION), 1)
 ASFLAGS += --defsym ROGUE_EXPANSION=1
@@ -158,7 +180,29 @@ ifeq ($(RELEASE), 0)
 ASFLAGS += --defsym ROGUE_DEBUG=1
 endif
 
-ifeq ($(MODERN),0)
+ifeq ($(PORTABLE),1)
+CC1              = $(shell $(PATH_MODERNCC) -m32 --print-prog-name=cc1) -quiet
+ifeq ($(DINFO),1)
+override CFLAGS += -O0
+else
+override CFLAGS += -O2
+endif
+override CFLAGS += -m32 -std=gnu17 -funsigned-char -fno-strict-aliasing -fwrapv -fno-builtin -fcommon -Werror=implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast
+ifeq ($(TARGET_OS),WINDOWS)
+override CFLAGS += -fleading-underscore
+endif
+ifeq ($(TARGET_OS),WINDOWS)
+ROM := pokeemerald_rogue.exe
+else
+ROM := pokeemerald_rogue
+endif
+OBJ_DIR := $(OBJ_BASE_DIR_NAME)/pc_$(TARGET_OS)_$(BUILD_CONFIG)
+TESTELF = pc-test-unused.elf
+ELF = $(OBJ_DIR)/unused.elf
+MAP = $(OBJ_DIR)/unused.map
+SYM = $(OBJ_DIR)/unused.sym
+HEADLESSELF = pc-test-headless-unused.elf
+else ifeq ($(MODERN),0)
 CC1             := tools/agbcc/bin/agbcc$(EXE)
 override CFLAGS += -mthumb-interwork -Wimplicit -Wparentheses -Werror -O2 -fhex-asm -g
 ROM := $(ROM_NAME)
@@ -199,6 +243,14 @@ OBJ_DIR := $(TEST_OBJ_DIR_NAME)
 endif
 
 CPPFLAGS := -iquote include -iquote $(GFLIB_SUBDIR) -Wno-trigraphs -DMODERN=$(MODERN) -DTESTING=$(TEST) -std=gnu17
+ifeq ($(PORTABLE),1)
+CPP := $(PREFIX)gcc -m32 -E
+CPPFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -D PORTABLE -D NONMATCHING -D UBFIX -D $(TARGET_PLATFORM) -D $(TILE_RENDERER) -D TARGET_$(TARGET_OS)
+ifeq ($(TARGET_OS),WINDOWS)
+SDL_DIR ?= SDL2/i686-w64-mingw32
+CPPFLAGS += -I $(SDL_DIR)/include -DSDL_DISABLE_IMMINTRIN_H -DSDL_DISABLE_MMINTRIN_H -DSDL_DISABLE_XMMINTRIN_H -DSDL_DISABLE_EMMINTRIN_H -DSDL_DISABLE_PMMINTRIN_H
+endif
+endif
 ifneq ($(MODERN),1)
 CPPFLAGS += -I tools/agbcc/include -I tools/agbcc -nostdinc -undef
 endif
@@ -233,6 +285,12 @@ CUSTOMJSON := tools/Pokabbie/Build/CustomJson/customjson$(EXE)
 QUERYBAKER := tools/Pokabbie/Build/QueryBaker/querybaker$(EXE)
 
 PERL := perl
+ASMFILTER := python3 tools/pc/asmfilter.py
+ifeq ($(PORTABLE),1)
+ASM_TO_HOST := | $(ASMFILTER) -
+else
+ASM_TO_HOST :=
+endif
 
 # Inclusive list. If you don't want a tool to be built, don't add it here.
 TOOLDIRS := tools/aif2pcm tools/bin2c tools/gbafix tools/gbagfx tools/jsonproc tools/mapjson tools/mid2agb tools/preproc tools/ramscrgen tools/rsfont tools/scaninc tools/Pokabbie/Build/MemoryStats tools/Pokabbie/Build/CustomJson
@@ -318,7 +376,14 @@ SONG_OBJS := $(patsubst $(SONG_SUBDIR)/%.s,$(SONG_BUILDDIR)/%.o,$(SONG_SRCS))
 MID_SRCS := $(wildcard $(MID_SUBDIR)/*.mid)
 MID_OBJS := $(patsubst $(MID_SUBDIR)/%.mid,$(MID_BUILDDIR)/%.o,$(MID_SRCS))
 
+ifeq ($(PORTABLE),1)
+OBJS     := $(C_OBJS) $(GFLIB_OBJS) $(ASM_OBJS) $(DATA_ASM_OBJS) $(SONG_OBJS) $(MID_OBJS)
+ifeq ($(TARGET_OS),WINDOWS)
+OBJS     += $(OBJ_DIR)/res.o
+endif
+else
 OBJS     := $(C_OBJS) $(GFLIB_OBJS) $(C_ASM_OBJS) $(ASM_OBJS) $(DATA_ASM_OBJS) $(SONG_OBJS) $(MID_OBJS)
+endif
 OBJS_REL := $(patsubst $(OBJ_DIR)/%,%,$(OBJS))
 
 SUBDIRS  := $(sort $(dir $(OBJS) $(dir $(TEST_OBJS))))
@@ -415,7 +480,12 @@ sound/%.bin: sound/%.aif ; $(AIF) $< $@
 data/%.inc: data/%.pory; $(PORYSCRIPT) -i $< -o $@ $(PORYSCRIPTARGS)
 
 
-ifeq ($(MODERN),0)
+ifeq ($(PORTABLE),1)
+# Files from the SDL2 port were written for x86 signed char
+$(C_BUILDDIR)/platform/%.o: override CFLAGS += -fsigned-char
+$(C_BUILDDIR)/music_player.o: override CFLAGS += -fsigned-char
+$(C_BUILDDIR)/sound_mixer.o: override CFLAGS += -fsigned-char
+else ifeq ($(MODERN),0)
 $(C_BUILDDIR)/libc.o: CC1 := tools/agbcc/bin/old_agbcc$(EXE)
 $(C_BUILDDIR)/libc.o: CFLAGS := -O2
 
@@ -500,11 +570,11 @@ endif
 
 ifeq ($(NODEP),1)
 $(C_BUILDDIR)/%.o: $(C_SUBDIR)/%.s
-	$(PREPROC) $< charmap.txt | $(CPP) -I include - | $(AS) $(ASFLAGS) -o $@
+	$(PREPROC) $< charmap.txt | $(CPP) -I include - $(ASM_TO_HOST) | $(AS) $(ASFLAGS) -o $@
 else
 define SRC_ASM_DATA_DEP
 $1: $2 $$(shell $(SCANINC) -I include -I "" $2)
-	$$(PREPROC) $$< charmap.txt | $$(CPP) -I include - | $$(AS) $$(ASFLAGS) -o $$@
+	$$(PREPROC) $$< charmap.txt | $$(CPP) -I include - $$(ASM_TO_HOST) | $$(AS) $$(ASFLAGS) -o $$@
 endef
 $(foreach src, $(C_ASM_SRCS), $(eval $(call SRC_ASM_DATA_DEP,$(patsubst $(C_SUBDIR)/%.s,$(C_BUILDDIR)/%.o, $(src)),$(src))))
 endif
@@ -522,14 +592,19 @@ endif
 
 ifeq ($(NODEP),1)
 $(DATA_ASM_BUILDDIR)/%.o: $(DATA_ASM_SUBDIR)/%.s
-	$(PREPROC) $< charmap.txt | $(CPP) -I include - | $(AS) $(ASFLAGS) -o $@
+	$(PREPROC) $< charmap.txt | $(CPP) -I include - $(ASM_TO_HOST) | $(AS) $(ASFLAGS) -o $@
 else
 $(foreach src, $(REGULAR_DATA_ASM_SRCS), $(eval $(call SRC_ASM_DATA_DEP,$(patsubst $(DATA_ASM_SUBDIR)/%.s,$(DATA_ASM_BUILDDIR)/%.o, $(src)),$(src))))
 endif
 endif
 
+ifeq ($(PORTABLE),1)
+$(SONG_BUILDDIR)/%.o: $(SONG_SUBDIR)/%.s
+	$(ASMFILTER) $< | $(AS) $(ASFLAGS) -o $@ -
+else
 $(SONG_BUILDDIR)/%.o: $(SONG_SUBDIR)/%.s
 	$(AS) $(ASFLAGS) -I sound -o $@ $<
+endif
 
 $(OBJ_DIR)/sym_bss.ld: sym_bss.txt
 	$(RAMSCRGEN) .bss $< ENGLISH > $@
@@ -559,6 +634,21 @@ endif
 $(OBJ_DIR)/ld_script.ld: $(LD_SCRIPT) $(LD_SCRIPT_DEPS)
 	cd $(OBJ_DIR) && sed "s#tools/#../../tools/#g" ../../$(LD_SCRIPT) > ld_script.ld
 
+ifeq ($(PORTABLE),1)
+ifeq ($(TARGET_OS),WINDOWS)
+PC_LIBS := -L$(SDL_DIR)/lib -lmingw32 -lSDL2main -lSDL2 -lm -lwinmm -lxinput -mconsole -static-libgcc
+else
+PC_LIBS := -lSDL2 -lm -no-pie
+endif
+
+$(OBJ_DIR)/res.o: $(C_SUBDIR)/platform/win32res/res.rc $(C_SUBDIR)/platform/win32res/icon.ico
+	$(PREFIX)windres $< -o $@
+
+$(ROM): $(OBJS)
+	@echo "$(MODERNCC) -m32 <objects> $(PC_LIBS) -o $@"
+	@cd $(OBJ_DIR) && $(MODERNCC) -m32 $(OBJS_REL) $(patsubst -L%,-L../../%,$(PC_LIBS)) -o ../../$@
+	@echo "Built $@"
+else
 LDFLAGS = -Map ../../$(MAP)
 $(ELF): $(OBJ_DIR)/ld_script.ld $(OBJS) libagbsyscall
 	@echo "cd $(OBJ_DIR) && $(LD) $(LDFLAGS) -T ld_script.ld -o ../../$@ <objects> <lib>"
@@ -570,6 +660,7 @@ $(ROM): $(ELF)
 	$(FIX) $@ -p --silent
 	@echo "ROM size:" $$(stat -c "%s" $(ROM) | numfmt --to=iec --format="%.2f")
 	@echo $(MEMORYSTATS) -F $(MODERN_MAP_NAME)
+endif
 
 agbcc: all
 

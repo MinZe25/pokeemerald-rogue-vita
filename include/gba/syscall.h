@@ -27,7 +27,7 @@ u16 ArcTan2(s16 x, s16 y);
 
 void CpuSet(const void *src, void *dest, u32 control);
 
-#if MODERN
+#if MODERN && !defined PORTABLE
 // NOTE: Assumes 16-bit CpuSets unless control is a constant and has
 // CPU_SET_32BIT set.
 #define CpuSet(src, dest, control) \
@@ -43,7 +43,7 @@ void CpuSet(const void *src, void *dest, u32 control);
 
 void CpuFastSet(const void *src, void *dest, u32 control);
 
-#if MODERN
+#if MODERN && !defined PORTABLE
 #define CpuFastSet(src, dest, control) \
     do \
     { \
