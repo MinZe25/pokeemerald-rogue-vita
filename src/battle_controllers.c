@@ -1352,6 +1352,11 @@ void BtlController_EmitChosenMonReturnValue(u32 battler, u32 bufferId, u8 partyI
 
     gBattleResources->transferBuffer[0] = CONTROLLER_CHOSENMONRETURNVALUE;
     gBattleResources->transferBuffer[1] = partyId;
+#ifdef PORTABLE
+    // Callers pass NULL when the party menu was cancelled; on GBA this reads the BIOS region
+    if (battlePartyOrder == NULL)
+        battlePartyOrder = gBattlePartyCurrentOrder;
+#endif
     for (i = 0; i < (int)ARRAY_COUNT(gBattlePartyCurrentOrder); i++)
         gBattleResources->transferBuffer[2 + i] = battlePartyOrder[i];
     PrepareBufferDataTransfer(battler, bufferId, gBattleResources->transferBuffer, 5);
