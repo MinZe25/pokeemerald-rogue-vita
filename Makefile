@@ -20,17 +20,27 @@ export PATH := $(TOOLCHAIN)/bin:$(PATH)
 endif
 endif
 
-# PC port: `make PORTABLE=1 TARGET_OS=LINUX` or `make PORTABLE=1 TARGET_OS=WINDOWS`
+# PC port: `make PORTABLE=1 TARGET_OS=LINUX|WINDOWS|VITA`
 PORTABLE ?= 0
 TARGET_OS ?= LINUX
 TARGET_PLATFORM ?= PLATFORM_SDL2
-TILE_RENDERER ?= RENDERER_EASY_DRAW
+TILE_RENDERER ?= RENDERER_FAST_DRAW
 
 ifeq ($(PORTABLE),1)
 ifeq ($(TARGET_OS),WINDOWS)
 PREFIX := i686-w64-mingw32-
+HOST_ARCH_FLAGS := -m32
+HOST_AS_FLAGS := --32
+else ifeq ($(TARGET_OS),VITA)
+VITASDK ?= $(HOME)/vitasdk
+export PATH := $(VITASDK)/bin:$(PATH)
+PREFIX := arm-vita-eabi-
+HOST_ARCH_FLAGS := -march=armv7-a -mtune=cortex-a9 -mfpu=neon -mfloat-abi=hard -mthumb
+HOST_AS_FLAGS := -march=armv7-a -mfpu=neon -mfloat-abi=hard
 else
 PREFIX :=
+HOST_ARCH_FLAGS := -m32
+HOST_AS_FLAGS := --32
 endif
 else
 PREFIX := arm-none-eabi-
@@ -38,7 +48,7 @@ endif
 OBJCOPY := $(PREFIX)objcopy
 OBJDUMP := $(PREFIX)objdump
 ifeq ($(PORTABLE),1)
-AS := $(PREFIX)as --32
+AS := $(PREFIX)as $(HOST_AS_FLAGS)
 else
 AS := $(PREFIX)as
 endif
@@ -181,18 +191,20 @@ ASFLAGS += --defsym ROGUE_DEBUG=1
 endif
 
 ifeq ($(PORTABLE),1)
-CC1              = $(shell $(PATH_MODERNCC) -m32 --print-prog-name=cc1) -quiet
+CC1              = $(shell $(PATH_MODERNCC) $(HOST_ARCH_FLAGS) --print-prog-name=cc1) -quiet
 ifeq ($(DINFO),1)
 override CFLAGS += -O0
 else
 override CFLAGS += -O2
 endif
-override CFLAGS += -m32 -std=gnu17 -funsigned-char -fno-strict-aliasing -fwrapv -fno-builtin -fcommon -Werror=implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast
+override CFLAGS += $(HOST_ARCH_FLAGS) -std=gnu17 -funsigned-char -fno-strict-aliasing -fwrapv -fno-builtin -fcommon -Werror=implicit-function-declaration -Wno-int-conversion -Wno-incompatible-pointer-types -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast
 ifeq ($(TARGET_OS),WINDOWS)
 override CFLAGS += -fleading-underscore
 endif
 ifeq ($(TARGET_OS),WINDOWS)
 ROM := pokeemerald_rogue.exe
+else ifeq ($(TARGET_OS),VITA)
+ROM := pokeemerald_rogue.vpk
 else
 ROM := pokeemerald_rogue
 endif
@@ -244,7 +256,7 @@ endif
 
 CPPFLAGS := -iquote include -iquote $(GFLIB_SUBDIR) -Wno-trigraphs -DMODERN=$(MODERN) -DTESTING=$(TEST) -std=gnu17
 ifeq ($(PORTABLE),1)
-CPP := $(PREFIX)gcc -m32 -E
+CPP := $(PREFIX)gcc $(HOST_ARCH_FLAGS) -E
 CPPFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -D PORTABLE -D NONMATCHING -D UBFIX -D $(TARGET_PLATFORM) -D $(TILE_RENDERER) -D TARGET_$(TARGET_OS)
 ifeq ($(TARGET_OS),WINDOWS)
 SDL_DIR ?= SDL2/i686-w64-mingw32
@@ -472,6 +484,13 @@ include $(OBJEVENTGFXDIR)/pokemon_ow/include/spritesheet_rules_gen.mk
 %.aif: ;
 %.pory: ;
 
+data/specials_local.inc: data/specials.inc
+	@echo "Generating $@"
+	@{ echo "@ Generated from data/specials.inc: local SPECIAL_* values"; echo ".set __special_l__, 0"; \
+	  sed -n 's/^[[:space:]]*def_special[[:space:]]\+\([A-Za-z0-9_]*\).*/.set SPECIAL_\1, __special_l__\n.set __special_l__, __special_l__ + 1/p' $<; } > $@
+
+$(DATA_ASM_BUILDDIR)/mystery_gift.o: data/specials_local.inc
+
 %.1bpp: %.png  ; $(GFX) $< $@
 %.4bpp: %.png  ; $(GFX) $< $@
 %.8bpp: %.png  ; $(GFX) $< $@
@@ -646,13 +665,28 @@ PC_LIBS := -L$(SDL_DIR)/lib -lmingw32 -lSDL2main -lSDL2 -lm -lwinmm -lxinput9_1_
 else
 PC_LIBS := -lSDL2 -lm -no-pie
 endif
+ifeq ($(TARGET_OS),VITA)
+PC_LIBS := -Wl,-q -lSDL2 -lSceGxm_stub -lSceDisplay_stub -lSceCtrl_stub -lSceAppMgr_stub -lSceAppUtil_stub -lSceAudio_stub -lSceAudioIn_stub -lSceSysmodule_stub -lSceIofilemgr_stub -lSceCommonDialog_stub -lSceTouch_stub -lSceHid_stub -lSceMotion_stub -lScePower_stub -lSceProcessmgr_stub -lm
+VITA_TITLE := Pokemon Emerald Rogue
+VITA_TITLEID := PKMR00001
+endif
 
 $(OBJ_DIR)/res.o: $(C_SUBDIR)/platform/win32res/res.rc $(C_SUBDIR)/platform/win32res/icon.ico
 	$(PREFIX)windres $< -o $@
 
 $(ROM): $(OBJS)
-	@echo "$(MODERNCC) -m32 <objects> $(PC_LIBS) -o $@"
-	@cd $(OBJ_DIR) && $(MODERNCC) -m32 $(OBJS_REL) $(patsubst -L%,-L../../%,$(PC_LIBS)) -o ../../$@
+ifeq ($(TARGET_OS),VITA)
+	@echo "$(MODERNCC) <objects> $(PC_LIBS) -o $(OBJ_DIR)/eboot.elf"
+	@cd $(OBJ_DIR) && $(MODERNCC) $(HOST_ARCH_FLAGS) $(OBJS_REL) $(PC_LIBS) -o eboot.elf
+	vita-elf-create $(OBJ_DIR)/eboot.elf $(OBJ_DIR)/eboot.velf
+	vita-make-fself -c -s $(OBJ_DIR)/eboot.velf $(OBJ_DIR)/eboot.bin
+	vita-mksfoex -s TITLE_ID=$(VITA_TITLEID) "$(VITA_TITLE)" $(OBJ_DIR)/param.sfo
+	vita-pack-vpk -s $(OBJ_DIR)/param.sfo -b $(OBJ_DIR)/eboot.bin \
+		-a $(C_SUBDIR)/platform/vita/icon0.png=sce_sys/icon0.png $@
+else
+	@echo "$(MODERNCC) $(HOST_ARCH_FLAGS) <objects> $(PC_LIBS) -o $@"
+	@cd $(OBJ_DIR) && $(MODERNCC) $(HOST_ARCH_FLAGS) $(OBJS_REL) $(patsubst -L%,-L../../%,$(PC_LIBS)) -o ../../$@
+endif
 	@echo "Built $@"
 else
 LDFLAGS = -Map ../../$(MAP)

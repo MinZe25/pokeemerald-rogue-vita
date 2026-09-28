@@ -125,6 +125,72 @@ static bool winCheckHorizontalBounds(u16 left, u16 right, u16 xpos)
         return (xpos >= left && xpos < right);
 }
 
+// Generic per-pixel renderer for 256 colour text backgrounds. The specialised
+// renderers below only handle 16 colour tiles; 8bpp BGs are rare (logos,
+// title-type screens) so this favours correctness over speed.
+static void RenderBGScanline8bpp(int bgNum, uint16_t control, uint16_t hoffs, uint16_t voffs, int lineNum, uint16_t *line, struct scanlineData* scanline, bool windowsEnabled)
+{
+    unsigned int charBaseBlock = (control >> 2) & 3;
+    unsigned int screenBaseBlock = (control >> 8) & 0x1F;
+    unsigned int mapWidthInPixels = bgMapSizes[control >> 14][0] * 8;
+    unsigned int mapHeightInPixels = bgMapSizes[control >> 14][1] * 8;
+    uint16_t *bgmap = (uint16_t *)BG_SCREEN_ADDR(screenBaseBlock);
+    uint8_t *bgtiles = (uint8_t *)BG_CHAR_ADDR(charBaseBlock);
+    uint16_t *pal = (uint16_t *)PLTT;
+    uint16_t *mask = scanline->bgMask;
+    uint8_t blendMode = (REG_BLDCNT >> 6) & 3;
+    bool bgBlends = blendMode != 0 && (REG_BLDCNT & (1 << bgNum));
+    unsigned int yy, ty, tileY;
+    uint16_t *rowBase;
+
+    if (control & BGCNT_MOSAIC)
+        lineNum = applyBGVerticalMosaicEffect(lineNum);
+
+    yy = (lineNum + voffs) & (mapHeightInPixels - 1);
+    ty = yy / 8;
+    tileY = yy & 7;
+    rowBase = bgmap;
+    if (ty >= 32)
+        rowBase += (mapWidthInPixels > 256) ? 0x800 : 0x400;
+    rowBase += (ty & 31) * 32;
+
+    for (int x = 0; x < DISPLAY_WIDTH; x++)
+    {
+        unsigned int xx = (x + hoffs) & (mapWidthInPixels - 1);
+        unsigned int tx = xx / 8;
+        uint16_t entry = rowBase[(tx & 31) + ((tx >= 32) ? 0x400 : 0)];
+        unsigned int px = (entry & (1 << 10)) ? 7 - (xx & 7) : (xx & 7);
+        unsigned int py = (entry & (1 << 11)) ? 7 - tileY : tileY;
+        uint8_t pixel = bgtiles[(entry & 0x3FF) * 64 + py * 8 + px];
+        uint16_t color;
+
+        if (pixel == 0)
+            continue;
+        if (windowsEnabled && !(scanline->winMask[x] & (1 << bgNum)))
+            continue;
+
+        color = pal[pixel];
+        if (bgBlends && (!windowsEnabled || (scanline->winMask[x] & WINMASK_CLR)))
+        {
+            switch (blendMode)
+            {
+            case 1:
+                if (mask[x] & (REG_BLDCNT >> 8))
+                    color = alphaBlendColor(color, line[x]);
+                break;
+            case 2:
+                color = alphaBrightnessIncrease(color);
+                break;
+            case 3:
+                color = alphaBrightnessDecrease(color);
+                break;
+            }
+        }
+        line[x] = color | 0x8000;
+        mask[x] = 1 << bgNum;
+    }
+}
+
 static void RenderBGScanlineWinBlend(int bgNum, uint16_t control, uint16_t hoffs, uint16_t voffs, int lineNum, uint16_t *line, struct scanlineData* scanline, bool windowsEnabled)
 {
     unsigned int charBaseBlock = (control >> 2) & 3;
@@ -2574,7 +2640,9 @@ static void DrawScanline(uint16_t *pixels, uint16_t vcount)
                     uint16_t bgvoffs = *(uint16_t *)(REG_ADDR_BG0VOFS + bgnum * 4);
                     bool doesBGblend = (blendMode != 0 && REG_BLDCNT & (1 << bgnum));
                     
-                    if (IsInsideWinIn)
+                    if (scanline.bgcnts[bgnum] & BGCNT_256COLOR)
+                        RenderBGScanline8bpp(bgnum, scanline.bgcnts[bgnum], bghoffs, bgvoffs, vcount, pixels, &scanline, windowsEnabled);
+                    else if (IsInsideWinIn)
                     {
                         //blending check
                         if (doesBGblend)
@@ -2612,7 +2680,9 @@ static void DrawScanline(uint16_t *pixels, uint16_t vcount)
                     
                     if (bgnum != 2)
                     {
-                        if (IsInsideWinIn)
+                        if (scanline.bgcnts[bgnum] & BGCNT_256COLOR)
+                            RenderBGScanline8bpp(bgnum, scanline.bgcnts[bgnum], bghoffs, bgvoffs, vcount, pixels, &scanline, windowsEnabled);
+                        else if (IsInsideWinIn)
                         {
                             //blending check
                             if (doesBGblend)

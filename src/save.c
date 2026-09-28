@@ -499,6 +499,11 @@ static u8 CopySaveSlotData(u16 sectorId, struct SaveSectorLocation *locations)
         id = gReadWriteSector->id;
         if (id == 0)
             gLastWrittenSector = i;
+#ifdef PORTABLE
+        // Blank flash reads as 0xFF: on GBA the out-of-range lookup below is harmless, here it crashes
+        if (id >= NUM_SECTORS_PER_SLOT)
+            continue;
+#endif
 
         checksum = CalculateChecksum(gReadWriteSector->data, locations[id].size);
 
