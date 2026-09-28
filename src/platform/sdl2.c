@@ -339,9 +339,13 @@ static bool RunGameFrame(bool draw)
     MainLoop();
     if (sPerfLog)
         t1 = NowMs();
+    // Run the VBlank work (OAM/palette/tile copies, buffered register writes) before
+    // drawing, like the GBA, which displays the state committed at VBlank. Drawing
+    // first showed register changes a frame before the VRAM copies they depend on
+    // (garbage tiles for a frame, very visible at Rogue's 4x battle speed).
+    RunDMAsAndVBlank();
     if (draw || sHeadless)
         VDraw(sdlTexture);
-    RunDMAsAndVBlank();
     if (sPerfLog)
     {
         t2 = NowMs();
