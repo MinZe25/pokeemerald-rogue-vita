@@ -91,8 +91,17 @@ static const u8 sStatNamesTable[NUM_STATS][13] = // a;t versopm pf gStatNamesTab
 static u8 const sText_The[] = _(" the ");
 static u8 const sText_TheShiny[] = _(" the shiny ");
 
+#ifdef PORTABLE
+char *getenv(const char *name);
+#endif
+
 bool8 Rogue_CheckPartyHasRoomForMon(void)
 {
+#ifdef PORTABLE
+    // Test harness: behave as if in a run so the replace-a-party-member flow runs
+    if (getenv("ROGUE_FULLPARTY") != NULL && CalculatePlayerPartyCount() >= PARTY_SIZE)
+        return FALSE;
+#endif
     if(Rogue_IsRunActive())
     {
         u8 partySize = Rogue_GetMaxPartySize();

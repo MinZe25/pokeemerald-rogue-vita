@@ -2915,6 +2915,13 @@ static u8 CalcBarFilledPixels(s32 maxValue, s32 oldValue, s32 receivedValue, s32
     for (i = 0; i < scale; i++)
         pixelsArray[i] = 0;
 
+#ifdef PORTABLE
+    // e.g. redrawing the healthbox of a mon that was just released to make room for a catch.
+    // GBA division by zero yields 0; on PC it traps.
+    if (maxValue == 0)
+        pixels = 0;
+    else
+#endif
     if (maxValue < totalPixels)
         pixels = (*currValue * totalPixels / maxValue) >> 8;
     else

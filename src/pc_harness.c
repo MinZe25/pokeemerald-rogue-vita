@@ -2,6 +2,7 @@
 // Test hooks for the PC/Vita automated harness (see src/platform/sdl2.c).
 // Called once per frame; does nothing unless the harness asks for it.
 #include "global.h"
+char *getenv(const char *name);
 #include "main.h"
 #include "battle_setup.h"
 #include "item.h"
@@ -18,6 +19,21 @@ void Harness_StartTestBattle(void)
 
     if (gPlayerPartyCount == 0)
         ScriptGiveMon(SPECIES_TREECKO, 10, ITEM_NONE, 0, 0, 0);
+    if (getenv("ROGUE_FULLPARTY") != NULL)
+    {
+        static const u16 sFill[] = { SPECIES_POOCHYENA, SPECIES_WURMPLE, SPECIES_LOTAD, SPECIES_SEEDOT, SPECIES_RALTS };
+        // write straight into the party: outside a run Rogue sends extra gifts to the PC
+        for (int slot = CalculatePlayerPartyCount(), i = 0; slot < PARTY_SIZE; slot++, i++)
+            CreateMon(&gPlayerParty[slot], sFill[i % 5], 8, USE_RANDOM_IVS, FALSE, 0, OT_ID_PLAYER_ID, 0);
+        CalculatePlayerPartyCount();
+    }
+    if (getenv("ROGUE_FULLPARTY") != NULL)
+    {
+        // so the R quick-ball shortcut picks the Master Ball
+        static const u16 sBalls[] = { ITEM_POKE_BALL, ITEM_GREAT_BALL, ITEM_ULTRA_BALL, ITEM_PREMIER_BALL };
+        for (int i = 0; i < 4; i++)
+            RemoveBagItem(sBalls[i], CountTotalItemQuantityInBag(sBalls[i]));
+    }
     AddBagItem(ITEM_MASTER_BALL, 5);
     CreateScriptedWildMon(SPECIES_ZIGZAGOON, 3, ITEM_NONE, FALSE);
     BattleSetup_StartScriptedWildBattle();
