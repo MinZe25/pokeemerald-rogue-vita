@@ -5125,6 +5125,12 @@ static void Cmd_endselectionscript(void)
 
 static void PlayAnimation(u32 battler, u8 animId, const u16 *argPtr, const u8 *nextInstr)
 {
+#ifdef PORTABLE
+    // Scripts may omit the argument (NULL): harmless BIOS read on GBA, crash here
+    static const u16 sNoAnimArg = 0;
+    if (argPtr == NULL)
+        argPtr = &sNoAnimArg;
+#endif
     if (B_TERRAIN_BG_CHANGE == FALSE && animId == B_ANIM_RESTORE_BG)
     {
         // workaround for .if not working
