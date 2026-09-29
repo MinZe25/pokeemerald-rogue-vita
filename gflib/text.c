@@ -276,6 +276,16 @@ bool16 AddTextPrinter(struct TextPrinterTemplate *printerTemplate, u8 speed, voi
     if (!gFonts)
         return FALSE;
 
+#ifdef PORTABLE
+    // NULL strings (e.g. an item without a description) print as empty text:
+    // the GBA would render whatever bytes sit at address 0
+    if (printerTemplate->currentChar == NULL)
+    {
+        static const u8 sEmptyText[] = { EOS };
+        printerTemplate->currentChar = sEmptyText;
+    }
+#endif
+
     sTempTextPrinter.active = TRUE;
     sTempTextPrinter.state = RENDER_STATE_HANDLE_CHAR;
     sTempTextPrinter.textSpeed = speed;

@@ -4517,7 +4517,8 @@ static void InitBoxMonSprites(u8 boxId)
     {
         for (boxPosition = 0; boxPosition < IN_BOX_COUNT; boxPosition++)
         {
-            if (GetBoxMonDataAt(boxId, boxPosition, MON_DATA_HELD_ITEM) == ITEM_NONE)
+            if (GetBoxMonDataAt(boxId, boxPosition, MON_DATA_HELD_ITEM) == ITEM_NONE
+             && sStorage->boxMonsSprites[boxPosition] != NULL) // empty slots have no icon
                 sStorage->boxMonsSprites[boxPosition]->oam.objMode = ST_OAM_OBJ_BLEND;
         }
     }
@@ -7115,7 +7116,13 @@ static void SetDisplayMonData(void *pokemon, u8 mode)
         txtPtr[1] = EOS;
 
         if (sStorage->displayMonItemId != ITEM_NONE)
-            StringCopyPadded(sStorage->displayMonItemName, ItemId_GetName(sStorage->displayMonItemId), CHAR_SPACE, 8);
+        {
+            // bounded copy: a long name overran into the pointers after the buffer
+            u8 name[ARRAY_COUNT(sStorage->displayMonItemName)];
+            StringCopyN(name, ItemId_GetName(sStorage->displayMonItemId), sizeof(name) - 1);
+            name[sizeof(name) - 1] = EOS;
+            StringCopyPadded(sStorage->displayMonItemName, name, CHAR_SPACE, 8);
+        }
         else
             StringFill(sStorage->displayMonItemName, CHAR_SPACE, 8);
     }

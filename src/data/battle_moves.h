@@ -1,6 +1,6 @@
 #include "battle_scripts.h"
 
-const struct BattleMove gBattleMoves_Mainline[MOVES_COUNT_DYNAMAX] =
+const struct BattleMove gBattleMoves_Mainline[BATTLE_MOVES_TABLE_SIZE] =
 {
     [MOVE_NONE] =
     {
