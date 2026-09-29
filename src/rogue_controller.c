@@ -63,6 +63,14 @@
 #include "rogue_campaign.h"
 #include "rogue_charms.h"
 #include "rogue_controller.h"
+
+#ifdef PORTABLE
+// frontend "Save anywhere" option (src/platform/frontend.c): loading a normal
+// mid-run save must not count as save scumming
+extern int Platform_SaveAnywhere(void);
+#else
+#define Platform_SaveAnywhere() FALSE
+#endif
 #include "rogue_debug.h"
 #include "rogue_gameshow.h"
 #include "rogue_gifts.h"
@@ -3556,7 +3564,7 @@ bool8 Rogue_OnProcessPlayerFieldInput(void)
             }
         }
     }
-    else if(!RogueDebug_GetConfigToggle(DEBUG_TOGGLE_ALLOW_SAVE_SCUM) && gRogueLocal.hasQuickLoadPending)
+    else if(!RogueDebug_GetConfigToggle(DEBUG_TOGGLE_ALLOW_SAVE_SCUM) && !Platform_SaveAnywhere() && gRogueLocal.hasQuickLoadPending)
     {
         gRogueLocal.hasQuickLoadPending = FALSE;
 
