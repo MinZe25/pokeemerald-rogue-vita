@@ -535,10 +535,13 @@ extern u8 gEnemyPartyCount;
 extern struct Pokemon gEnemyParty[PARTY_SIZE];
 extern struct SpriteTemplate gMultiuseSpriteTemplate;
 
-#ifdef PORTABLE
+#if defined(PORTABLE) && !defined(__vita__)
 // Some code indexes the move table with MOVE_UNAVAILABLE (0xFFFF), e.g.
 // gChosenMoveByBattler of a battler that has not chosen a move: a harmless
-// ROM read on GBA, a crash here. Pad so any u16 move id reads a zeroed move.
+// ROM read on GBA, a crash on PC where the table can end near unmapped memory.
+// Pad so any u16 move id reads a zeroed move. Not on the Vita: the 3.6MB
+// bigger image no longer boots there, and the tables sit inside ~30MB of
+// .rodata, so such reads return garbage like on the GBA.
 #define BATTLE_MOVES_TABLE_SIZE 0x10000
 #else
 #define BATTLE_MOVES_TABLE_SIZE MOVES_COUNT_DYNAMAX
