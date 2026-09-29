@@ -21,7 +21,7 @@
 
 // Rogue's code can use a fair amount of stack; the default is 256KB
 int sceUserMainThreadStackSize = 4 * 1024 * 1024;
-unsigned int _newlib_heap_size_user = 128 * 1024 * 1024;
+unsigned int _newlib_heap_size_user = 64 * 1024 * 1024; // SDL + save state snapshots need far less
 
 #define DATA_DIR "ux0:data/pokeemerald_rogue/"
 #else
