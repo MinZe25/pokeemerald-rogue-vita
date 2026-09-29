@@ -62,6 +62,12 @@ static const union AnimCmd sAnim_SludgeBombHit[] =
 const union AnimCmd *const gAnims_PoisonProjectile[] =
 {
     sAnim_PoisonProjectile,
+#ifdef PORTABLE
+    // AnimSludgeProjectile / AnimAcidPoisonBubble start anim 2: on GBA this
+    // read the tables that follow in ROM, spell them out
+    sAnim_AcidPoisonDroplet,
+    sAnim_SludgeBombHit,
+#endif
 };
 
 const union AnimCmd *const gAnims_AcidPoisonDroplet[] =
