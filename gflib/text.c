@@ -643,6 +643,10 @@ void CopyGlyphToWindow(struct TextPrinter *textPrinter)
     glyphPixels = gCurGlyph.gfxBufferTop;
     windowTiles = window->tileData;
     widthOffset = template->width * 32;
+#ifdef PORTABLE
+    if (windowTiles == NULL) // text printer on a removed window
+        return;
+#endif
 
     if (glyphWidth < 9)
     {

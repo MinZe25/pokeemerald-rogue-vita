@@ -91,7 +91,8 @@ static int EmulateDivByZero(uint32_t *eip, uint32_t *eax, uint32_t *edx)
 #define EFLAGS_TF 0x100
 
 static int sLogFd = -1;
-static volatile uint8_t *sLow;
+static volatile uint8_t *sLow; // always NULL once mapped: that's the point
+static int sArmed;
 static uintptr_t sSites[MAX_SITES];
 static int sNumSites;
 static int sStepping;
@@ -160,7 +161,7 @@ static void OnFault(int sig, siginfo_t *si, void *ucv)
             return;
         }
     }
-    else if (sig == SIGSEGV && sLow != NULL && addr < LOW_SIZE && !sStepping)
+    else if (sig == SIGSEGV && sArmed && addr < LOW_SIZE && !sStepping)
     {
         sHits++;
         if (!SeenSite(pc))
@@ -225,11 +226,9 @@ void NullTrap_Init(void)
     atexit(OnExit);
 
     sLow = mmap(NULL, LOW_SIZE, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
-    if (sLow == MAP_FAILED || sLow != NULL)
-    {
-        sLow = NULL;
+    sArmed = (sLow == NULL);
+    if (!sArmed)
         LogLine("mmap of page 0 failed (sysctl vm.mmap_min_addr=0?)\n");
-    }
 
     sigaction(SIGSEGV, &sa, NULL);
     sigaction(SIGBUS, &sa, NULL);
@@ -237,7 +236,7 @@ void NullTrap_Init(void)
     sa.sa_sigaction = OnStep;
     sa.sa_flags = SA_SIGINFO;
     sigaction(SIGTRAP, &sa, NULL);
-    LogLine(sLow != NULL ? "nulltrap armed\n" : "div0/crash logging only\n");
+    LogLine(sArmed ? "nulltrap armed\n" : "div0/crash logging only\n");
 }
 
 #elif defined(_WIN32) && defined(__i386__)
