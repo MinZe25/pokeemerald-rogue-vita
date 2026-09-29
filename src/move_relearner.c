@@ -518,6 +518,21 @@ static void GatherLearnableMoves(struct Pokemon* mon)
 
 u8 GetNumberOfRelearnableMovesForContext(struct Pokemon* mon)
 {
+#ifdef PORTABLE
+    // Called by the party menu while sMoveRelearnerStruct is NULL (GBA writes
+    // near address 0 are harmless, here they crash): count into a local buffer
+    if (sMoveRelearnerStruct == NULL)
+    {
+        u16 moves[MAX_RELEARNER_MOVES];
+
+        if(sMoveRelearnerMenuSate.teachMoveState == TEACH_STATE_EGG_MOVES)
+            return GetEggMoves(mon, moves);
+        else if(sMoveRelearnerMenuSate.teachMoveState == TEACH_STATE_TUTOR_MOVES)
+            return GetTutorMoves(mon, moves, ARRAY_COUNT(moves));
+        else
+            return GetMoveRelearnerMoves(mon, moves);
+    }
+#endif
     if(sMoveRelearnerMenuSate.teachMoveState == TEACH_STATE_EGG_MOVES)
     {
         return sMoveRelearnerStruct->numMenuChoices = GetEggMoves(mon, sMoveRelearnerStruct->movesToLearn);
