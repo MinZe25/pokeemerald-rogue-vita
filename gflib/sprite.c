@@ -870,6 +870,15 @@ void BeginAnim(struct Sprite *sprite)
     sprite->animCmdIndex = 0;
     sprite->animEnded = FALSE;
     sprite->animLoopCounter = 0;
+#ifdef PORTABLE
+    {
+        // Anim numbers past the end of a table read whatever follows it: other
+        // tables on GBA, but not reliably a valid pointer here. Use anim 0.
+        uintptr_t anim = (uintptr_t)sprite->anims[sprite->animNum];
+        if (anim < 0x10000 || (anim & 3) != 0)
+            sprite->animNum = 0;
+    }
+#endif
     imageValue = sprite->anims[sprite->animNum][sprite->animCmdIndex].frame.imageValue;
 
     if (imageValue != -1)
