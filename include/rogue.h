@@ -7,7 +7,7 @@ struct RoguePartyMon
     bool8 hasPendingEvo : 1;
     u8 lastPopupLevel : 7;
     u8 pad0[3];
-};
+} GBA_STRUCT_LAYOUT;
 
 #ifndef ROGUE_BAKING
 STATIC_ASSERT(sizeof(struct RoguePartyMon) == 4, SizeOfRoguePartyMon);
@@ -36,7 +36,7 @@ struct RogueSafariMon
     u8 nickname[POKEMON_NAME_LENGTH];
     u8 priorityCounter;
     u8 customMonLookup; // (We can only store a limited number of custom mons in the safari)
-};
+} GBA_STRUCT_LAYOUT;
 
 #ifndef ROGUE_BAKING
 //STATIC_ASSERT(sizeof(struct RogueSafariMon) == 8, SizeOfRogueSafariMon);
@@ -63,7 +63,7 @@ struct RogueRoamerMon
 
     u32 status      : 16;
     u32 unused1     : 16; 
-};
+} GBA_STRUCT_LAYOUT;
 
 #ifndef ROGUE_BAKING
 STATIC_ASSERT(sizeof(struct RogueRoamerMon) == 12, SizeOfRogueRoamerMon);
@@ -103,7 +103,7 @@ struct RogueAdvPathRoomParams
             u16 trainerNum;
         } miniboss;
     } perType;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueAdvPathNode
 {
@@ -111,7 +111,7 @@ struct RogueAdvPathNode
     u8 isBridgeActive : 1;
     u8 isLadderActive : 1;
     struct RogueAdvPathRoomParams roomParams;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueAdvPathRoom
 {
@@ -120,7 +120,7 @@ struct RogueAdvPathRoom
     u16 rngSeed;
     u8 roomType;
     u8 connectionMask;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueAdvPath
 {
@@ -134,7 +134,7 @@ struct RogueAdvPath
     s8 pathMaxY;
     u8 isOverviewActive : 1;
     u8 justGenerated : 1;
-};
+} GBA_STRUCT_LAYOUT;
 
 
 // Adventure Path generation
@@ -157,13 +157,13 @@ struct RogueAdventurePhase
     u16 bossTrainerFlagsInclude;
     u16 bossTrainerFlagsExclude;
     struct RogueAdvPathGenerator pathGenerator;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueAdventureSettings
 {
     const struct RogueAdventurePhase* phases;
     u8 phaseCount;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueQuestState
 {
@@ -171,14 +171,14 @@ struct RogueQuestState
     u32 highestCompleteDifficulty : 3;
     u32 highestCollectedRewardDifficulty : 3;
     u32 unused : 12;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueCampaignState
 {
     u8 isUnlocked : 1;
     u8 isCompleted : 1;
     u16 bestScore;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueHubDecoration
 {
@@ -187,7 +187,7 @@ struct RogueHubDecoration
     u8 decorVariant;
     u8 active : 1;
     u8 unused : 7;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueHubMap
 {
@@ -199,17 +199,17 @@ struct RogueHubMap
     u8 upgradeFlags[1 + ((HUB_UPGRADE_COUNT - 1) / 8)];
     u16 weatherState;
     u8 statueLevel;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueCampaignData_LowBst
 {
     u16 scoreSpecies;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueCampaignData_Generic
 {
     u16 score;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueWildEncounters
 {
@@ -217,24 +217,24 @@ struct RogueWildEncounters
     u16 species[WILD_ENCOUNTER_TOTAL_CAPACITY];
     u8 catchCounts[WILD_ENCOUNTER_TOTAL_CAPACITY];
     u8 roamerActiveThisPath : 1;
-};
+} GBA_STRUCT_LAYOUT;
 
 // We just want this to be the same size as box pokemon so we can reserve the memory and cast laterpartyPid
 struct RogueBoxPokemonFacade
 {
     u8 data[80];
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RoguePokemonFacade
 {
     u8 data[104];
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueDaycarePokemon
 {
     struct RogueBoxPokemonFacade boxMonFacade;
     u8 unused : 1;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RoguePartySnapshot
 {
@@ -243,7 +243,7 @@ struct RoguePartySnapshot
     u16 partySpeciesGfx[PARTY_SIZE];
     u16 enemySpeciesGfx[PARTY_SIZE];
     u16 trainerId;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct GameModeRules
 {
@@ -266,7 +266,7 @@ struct GameModeRules
     u8 forceFullShopInventory : 1;
     u8 forceFullTutorMoves : 1;
     u8 rivalUsesPlayerLevel : 1;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueRunData
 {
@@ -318,7 +318,7 @@ struct RogueRunData
     bool8 isQuickSaveValid : 1;
     bool8 hasPendingRivalBattle : 1;
     bool8 rivalHasShiny : 1;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueHubArea
 {
@@ -332,7 +332,7 @@ struct RogueHubArea
     u16 primaryMapLayout;
     u8 primaryMapGroup;
     u8 buildCost;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueAreaUpgrade
 {
@@ -344,7 +344,7 @@ struct RogueAreaUpgrade
     u8 targetArea;
     u8 buildCost;
     bool8 isHidden : 1;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueRouteMap
 {
@@ -354,7 +354,7 @@ struct RogueRouteMap
 #ifdef ROGUE_DEBUG
     const u8 debugName[40];
 #endif
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueRouteEncounter
 {
@@ -362,13 +362,13 @@ struct RogueRouteEncounter
     u16 mapFlags;
     struct RogueRouteMap map;
     const u8 wildTypeTable[3];
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueRouteData
 {
     u8 routeCount;
     const struct RogueRouteEncounter* routes;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueEncounterMap
 {
@@ -376,20 +376,20 @@ struct RogueEncounterMap
     u16 layout;
     u16 group;
     u16 num;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueEncounterData
 {
     u8 mapCount;
     const struct RogueEncounterMap* mapTable;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueBattleMusicRedirect
 {
     u16 redirectParam;
     u8 redirectType;
     u8 musicPlayer;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueBattleMusic
 {
@@ -398,7 +398,7 @@ struct RogueBattleMusic
     u16 encounterMusic;
     u16 battleMusic;
     u16 victoryMusic;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueTeamGeneratorSubset
 {
@@ -411,7 +411,7 @@ struct RogueTeamGeneratorSubset
     u8 maxSamples;
     u8 isDiversitySubset : 1;
     u8 allowSpeciesDuplicates : 1;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueTeamGenerator
 {
@@ -421,7 +421,7 @@ struct RogueTeamGenerator
     struct RogueTeamGeneratorSubset const* subsets;
     u8 subsetCount;
     u8 preferredGender;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueTrainer
 {
@@ -441,7 +441,7 @@ struct RogueTrainer
     u8 musicPlayer;
     u8 encounterTextCount;
     struct RogueTeamGenerator teamGenerator;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct SpeciesTable
 {
@@ -449,19 +449,19 @@ struct SpeciesTable
     const u16* wildSpecies;
     u8 trainerSpeciesCount;
     const u16* trainerSpecies;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueDifficultyConfig
 {
     u8 toggleBits[CONFIG_TOGGLE_BYTE_COUNT];
     u8 rangeValues[CONFIG_RANGE_COUNT];
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueDebugConfig
 {
     u8 toggleBits[DEBUG_TOGGLE_BYTE_COUNT];
     u8 rangeValues[DEBUG_RANGE_COUNT];
-};
+} GBA_STRUCT_LAYOUT;
 
 // Rogue Multiplayer
 //
@@ -471,19 +471,19 @@ struct RogueNetHubState
     struct RogueDifficultyConfig difficultyConfig;
     u16 timeOfDay;
     u8 season;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueNetAdventureState
 {
     u16 baseSeed;
     u8 isRunActive : 1;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueNetGameState
 {
     struct RogueNetHubState hub;
     struct RogueNetAdventureState adventure;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueNetPlayerProfile
 {
@@ -495,13 +495,13 @@ struct RogueNetPlayerProfile
     u8 preferredOutfit;
     u8 fallbackOutfit;
     u8 isActive : 1;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueNetPlayerMovement
 {
     struct Coords16 pos;
     u8 movementAction;
-};
+} GBA_STRUCT_LAYOUT;
 
 
 
@@ -534,7 +534,7 @@ struct RogueNetPlayer
     u8 facingDirection : 4;
     u8 partnerFacingDirection : 4;
     u8 isInteractionOwner : 1;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueNetHandshake
 {
@@ -545,7 +545,7 @@ struct RogueNetHandshake
     u8 accepted : 1;
     u8 isVersionEx : 1;
     u8 isPermaRevisedActive : 1;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueNetMultiplayer
 {
@@ -557,7 +557,7 @@ struct RogueNetMultiplayer
     u8 netCurrentState;
     u8 localPlayerId;
     u8 localCounter;
-};
+} GBA_STRUCT_LAYOUT;
 
 // Rogue Assistant
 //
@@ -598,7 +598,7 @@ struct RogueAssistantHeader
     void const* assistantState;
     void const* multiplayerPtr;
     void const* homeBoxPtr;
-};
+} GBA_STRUCT_LAYOUT;
 
 extern const struct RogueAssistantHeader gRogueAssistantHeader;
 
@@ -607,7 +607,7 @@ struct RogueAutomationHeader
 {
     u32 commBufferCapacity;
     u16* commBuffer;
-};
+} GBA_STRUCT_LAYOUT;
 
 extern const struct RogueAutomationHeader gRogueAutomationHeader;
 #endif
@@ -620,7 +620,7 @@ struct PokemonObjectEventInfo
     u8 height;
     u8 defaultPaletteOffset;
     u8 shinyPaletteOffset;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RoguePokedexVariant
 {
@@ -628,14 +628,14 @@ struct RoguePokedexVariant
     const u16* speciesList;
     u16 speciesCount;
     u8 genLimit;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RoguePokedexRegion
 {
     const u8* displayName;
     const u16* variantList;
     u16 variantCount;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RoguePokemonCompetitiveSet
 {
@@ -646,7 +646,7 @@ struct RoguePokemonCompetitiveSet
     u8 hiddenPowerType;
     u8 teraType;
     u8 nature;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RoguePokemonCompetitiveSetRules
 {
@@ -657,7 +657,7 @@ struct RoguePokemonCompetitiveSetRules
     bool8 skipTeraType : 1;
     bool8 skipNature : 1;
     bool8 allowMissingMoves : 1;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RoguePokemonBaseStats
 {
@@ -669,7 +669,7 @@ struct RoguePokemonBaseStats
     u8 baseSpDefense;
     u8 types[2];
     u16 abilities[NUM_ABILITY_SLOTS];
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RoguePokemonProfile
 {
@@ -681,7 +681,7 @@ struct RoguePokemonProfile
     u16 monFlags;
     u16 competitiveSetCount;
     u8 evolutionCount;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueRideMonState
 {
@@ -690,21 +690,21 @@ struct RogueRideMonState
     u8 flyingHeight : 6;
     u8 whistleType : 1;
     bool8 flyingState : 1;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct AdventureReplay
 {
     struct RogueDifficultyConfig difficultyConfig;
     u16 baseSeed;
     u8 isValid : 1;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct UniqueMon
 {
     u32 customMonId;
     u16 species;
     u16 countDown;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueSaveBlock
 {
@@ -726,7 +726,7 @@ struct RogueSaveBlock
     u16 timeOfDayMinutes;
     u16 lastKnownNumSpecies;
     u8 seasonCounter;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueSpeciesBakedData
 {
@@ -737,14 +737,14 @@ struct RogueSpeciesBakedData
     u32 evolutionCount : 8;
     u32 evolutionChainTypeFlags_Revised : 18;
     u32 unused2 : 6;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RogueFollowMonGraphicsInfo
 {
     struct ObjectEventGraphicsInfo const* objectEventGfxInfo;
     u16 const* normalPal;
     u16 const* shinyPal;
-};
+} GBA_STRUCT_LAYOUT;
 
 #ifndef ROGUE_EXPANSION
 // Dud structs not defined in vanilla
@@ -752,7 +752,7 @@ struct RogueFollowMonGraphicsInfo
 struct FormChange
 {
     u32 dud;
-};
+} GBA_STRUCT_LAYOUT;
 
 #endif
 

@@ -18,14 +18,14 @@ typedef union // size = 0x24
         /*0x21*/ u8 srcTrainerIdHi;
         /*0x22*/ u8 trainerIdLo;
         /*0x23*/ u8 trainerIdHi;
-    } common;
+    } GBA_STRUCT_LAYOUT common;
 
     // Common init (used for initialization loop)
     struct {
         /*0x00*/ u8 kind;
         /*0x01*/ bool8 active;
         /*0x02*/ u8 data[34];
-    } commonInit;
+    } GBA_STRUCT_LAYOUT commonInit;
 
     // Local shows
     // TVSHOW_FAN_CLUB_LETTER
@@ -37,7 +37,7 @@ typedef union // size = 0x24
         /*0x10*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x18*/ u8 language;
         /*0x19*/ //u8 padding;
-    } fanclubLetter;
+    } GBA_STRUCT_LAYOUT fanclubLetter;
 
     // TVSHOW_RECENT_HAPPENINGS
     struct {
@@ -48,7 +48,7 @@ typedef union // size = 0x24
         /*0x10*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x18*/ u8 language;
         /*0x19*/ //u8 padding;
-    } recentHappenings;
+    } GBA_STRUCT_LAYOUT recentHappenings;
 
     // TVSHOW_PKMN_FAN_CLUB_OPINIONS
     struct {
@@ -64,7 +64,7 @@ typedef union // size = 0x24
         /*0x10*/ u8 nickname[PLAYER_NAME_LENGTH + 1];
         /*0x18*/ u16 words18[2];
         /*0x1C*/ u16 words[2];
-    } fanclubOpinions;
+    } GBA_STRUCT_LAYOUT fanclubOpinions;
 
     // TVSHOW_DUMMY
     struct {
@@ -75,7 +75,7 @@ typedef union // size = 0x24
         /*0x08*/ u8 filler_08[3];
         /*0x0B*/ u8 name[12];
         /*0x17*/ u8 language;
-    } dummy;
+    } GBA_STRUCT_LAYOUT dummy;
 
     // TVSHOW_NAME_RATER_SHOW
     struct {
@@ -90,7 +90,7 @@ typedef union // size = 0x24
         /*0x1C*/ u16 randomSpecies;
         /*0x1E*/ u8 language;
         /*0x1F*/ u8 pokemonNameLanguage;
-    } nameRaterShow;
+    } GBA_STRUCT_LAYOUT nameRaterShow;
 
     // TVSHOW_BRAVO_TRAINER_POKEMON_PROFILE (contest)
     struct {
@@ -107,7 +107,7 @@ typedef union // size = 0x24
         /*0x16*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x1E*/ u8 language;
         /*0x1F*/ u8 pokemonNameLanguage;
-    } bravoTrainer;
+    } GBA_STRUCT_LAYOUT bravoTrainer;
 
     // TVSHOW_BRAVO_TRAINER_BATTLE_TOWER_PROFILE
     struct {
@@ -125,7 +125,7 @@ typedef union // size = 0x24
         /*0x1D*/ u8 playerLanguage;
         /*0x1E*/ u8 opponentLanguage;
         /*0x1F*/ //u8 padding;
-    } bravoTrainerTower;
+    } GBA_STRUCT_LAYOUT bravoTrainerTower;
 
     // TVSHOW_CONTEST_LIVE_UPDATES
     struct {
@@ -144,7 +144,7 @@ typedef union // size = 0x24
         /*0x1D*/ u8 winningTrainerLanguage;
         /*0x1E*/ u8 losingTrainerLanguage;
         /*0x1F*/ //u8 padding;
-    } contestLiveUpdates;
+    } GBA_STRUCT_LAYOUT contestLiveUpdates;
 
     // TVSHOW_3_CHEERS_FOR_POKEBLOCKS
     struct {
@@ -158,7 +158,7 @@ typedef union // size = 0x24
         /*0x0C*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x14*/ u8 language;
         /*0x15*/ u8 worstBlenderLanguage;
-    } threeCheers;
+    } GBA_STRUCT_LAYOUT threeCheers;
 
     // TVSHOW_BATTLE_UPDATE
     struct {
@@ -173,7 +173,7 @@ typedef union // size = 0x24
         /*0x19*/ u8 language;
         /*0x1A*/ u8 linkOpponentLanguage;
         /*0x1B*/ //u8 padding;
-    } battleUpdate;
+    } GBA_STRUCT_LAYOUT battleUpdate;
 
     // TVSHOW_FAN_CLUB_SPECIAL
     struct {
@@ -188,7 +188,7 @@ typedef union // size = 0x24
         /*0x17*/ u8 language;
         /*0x18*/ u8 idolNameLanguage;
         /*0x19*/ //u8 padding;
-    } fanClubSpecial;
+    } GBA_STRUCT_LAYOUT fanClubSpecial;
 
     // TVSHOW_LILYCOVE_CONTEST_LADY
     struct {
@@ -200,7 +200,7 @@ typedef union // size = 0x24
         /*0x16*/ u8 pokeblockState;
         /*0x17*/ u8 language;
         /*0x18*/ u8 pokemonNameLanguage;
-    } contestLady;
+    } GBA_STRUCT_LAYOUT contestLady;
 
     // Record Mixing Shows
     // TVSHOW_POKEMON_TODAY_CAUGHT
@@ -215,7 +215,7 @@ typedef union // size = 0x24
         /*0x12*/ u8 nBallsUsed;
         /*0x13*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x1B*/ //u8 padding;
-    } pokemonToday;
+    } GBA_STRUCT_LAYOUT pokemonToday;
 
     // TVSHOW_SMART_SHOPPER
     struct {
@@ -229,7 +229,7 @@ typedef union // size = 0x24
         /*0x12*/ u8 shopLocation;
         /*0x13*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x1B*/ //u8 padding;
-    } smartshopperShow;
+    } GBA_STRUCT_LAYOUT smartshopperShow;
 
     // TVSHOW_POKEMON_TODAY_FAILED
     struct {
@@ -244,7 +244,7 @@ typedef union // size = 0x24
         /*0x12*/ u8 location;
         /*0x13*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x1B*/ //u8 padding;
-    } pokemonTodayFailed;
+    } GBA_STRUCT_LAYOUT pokemonTodayFailed;
 
     // TVSHOW_FISHING_ADVICE
     struct {
@@ -257,7 +257,7 @@ typedef union // size = 0x24
         /*0x07*/ u8 filler_07[12];
         /*0x13*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x1B*/ //u8 padding;
-    } pokemonAngler;
+    } GBA_STRUCT_LAYOUT pokemonAngler;
 
     // TVSHOW_WORLD_OF_MASTERS
     struct {
@@ -272,7 +272,7 @@ typedef union // size = 0x24
         /*0x0C*/ u8 filler_0C[7];
         /*0x13*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x1B*/ //u8 padding2;
-    } worldOfMasters;
+    } GBA_STRUCT_LAYOUT worldOfMasters;
 
     // TVSHOW_TODAYS_RIVAL_TRAINER
     struct {
@@ -289,7 +289,7 @@ typedef union // size = 0x24
         /*0x0D*/ u8 filler_0D[6];
         /*0x13*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x1B*/ //u8 padding2;
-    } rivalTrainer;
+    } GBA_STRUCT_LAYOUT rivalTrainer;
 
     // TVSHOW_TREND_WATCHER
     struct {
@@ -302,7 +302,7 @@ typedef union // size = 0x24
         /*0x0A*/ u8 filler_0a[9];
         /*0x13*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x1B*/ //u8 padding;
-    } trendWatcher;
+    } GBA_STRUCT_LAYOUT trendWatcher;
 
     // TVSHOW_TREASURE_INVESTIGATORS
     struct {
@@ -315,7 +315,7 @@ typedef union // size = 0x24
         /*0x08*/ u8 filler_08[11];
         /*0x13*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x1B*/ //u8 padding;
-    } treasureInvestigators;
+    } GBA_STRUCT_LAYOUT treasureInvestigators;
 
     // TVSHOW_FIND_THAT_GAMER
     struct {
@@ -329,7 +329,7 @@ typedef union // size = 0x24
         /*0x09*/ u8 filler_09[10];
         /*0x13*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x1B*/ //u8 padding;
-    } findThatGamer;
+    } GBA_STRUCT_LAYOUT findThatGamer;
 
     // TVSHOW_BREAKING_NEWS
     struct {
@@ -346,7 +346,7 @@ typedef union // size = 0x24
         /*0x0F*/ u8 filler_0f[4];
         /*0x13*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x1B*/ //u8 padding;
-    } breakingNews;
+    } GBA_STRUCT_LAYOUT breakingNews;
 
     // TVSHOW_SECRET_BASE_VISIT
     struct {
@@ -361,7 +361,7 @@ typedef union // size = 0x24
         /*0x0D*/ u8 filler_0d[6];
         /*0x13*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x1B*/ //u8 padding;
-    } secretBaseVisit;
+    } GBA_STRUCT_LAYOUT secretBaseVisit;
 
     // TVSHOW_LOTTO_WINNER
     struct {
@@ -373,7 +373,7 @@ typedef union // size = 0x24
         /*0x06*/ u8 filler_06[13];
         /*0x13*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x1B*/ //u8 padding;
-    } lottoWinner;
+    } GBA_STRUCT_LAYOUT lottoWinner;
 
     // TVSHOW_BATTLE_SEMINAR
     struct {
@@ -389,7 +389,7 @@ typedef union // size = 0x24
         /*0x12*/ u8 filler_12[1];
         /*0x13*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x1B*/ //u8 padding;
-    } battleSeminar;
+    } GBA_STRUCT_LAYOUT battleSeminar;
 
     // TVSHOW_TRAINER_FAN_CLUB
     struct {
@@ -401,7 +401,7 @@ typedef union // size = 0x24
         /*0x09*/ u8 filler_09[10];
         /*0x13*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x1B*/ //u8 padding;
-    } trainerFanClub;
+    } GBA_STRUCT_LAYOUT trainerFanClub;
 
     // TVSHOW_CUTIES
     struct {
@@ -414,7 +414,7 @@ typedef union // size = 0x24
         /*0x10*/ u8 pokemonNameLanguage;
         /*0x11*/ u8 filler_12[2];
         /*0x13*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
-    } cuties;
+    } GBA_STRUCT_LAYOUT cuties;
 
     // TVSHOW_FRONTIER
     struct {
@@ -430,7 +430,7 @@ typedef union // size = 0x24
         /*0x0E*/ u8 filler_0e[5];
         /*0x13*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x1B*/ //u8 padding;
-    } frontier;
+    } GBA_STRUCT_LAYOUT frontier;
 
     // TVSHOW_NUMBER_ONE
     struct {
@@ -442,7 +442,7 @@ typedef union // size = 0x24
         /*0x06*/ u8 filler_06[13];
         /*0x13*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
         /*0x1B*/ //u8 padding;
-    } numberOne;
+    } GBA_STRUCT_LAYOUT numberOne;
 
     // TVSHOW_SECRET_BASE_SECRETS
     struct {
@@ -457,7 +457,7 @@ typedef union // size = 0x24
         /*0x1B*/ u8 language;
         /*0x1C*/ u8 baseOwnersNameLanguage;
         /*0x1D*/ //u8 padding[3];
-    } secretBaseSecrets;
+    } GBA_STRUCT_LAYOUT secretBaseSecrets;
 
     // TVSHOW_SAFARI_FAN_CLUB
     struct {
@@ -468,7 +468,7 @@ typedef union // size = 0x24
         /*0x04*/ u8 language;
         /*0x05*/ u8 filler_05[14];
         /*0x13*/ u8 playerName[PLAYER_NAME_LENGTH + 1];
-    } safariFanClub;
+    } GBA_STRUCT_LAYOUT safariFanClub;
 
     // Mass Outbreak
     // TVSHOW_MASS_OUTBREAK
@@ -489,7 +489,7 @@ typedef union // size = 0x24
         /*0x16*/ u16 daysLeft;
         /*0x18*/ u8 language;
         /*0x19*/ //u8 padding;
-    } massOutbreak;
+    } GBA_STRUCT_LAYOUT massOutbreak;
 } TVShow;
 
 typedef struct
@@ -497,6 +497,6 @@ typedef struct
     u8 kind;
     u8 state;
     u16 dayCountdown;
-} PokeNews;
+} GBA_STRUCT_LAYOUT PokeNews;
 
 #endif //GUARD_GLOBAL_TV_H

@@ -168,44 +168,44 @@ struct Coords8
 {
     s8 x;
     s8 y;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct UCoords8
 {
     u8 x;
     u8 y;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct Coords16
 {
     s16 x;
     s16 y;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct UCoords16
 {
     u16 x;
     u16 y;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct Coords32
 {
     s32 x;
     s32 y;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct UCoords32
 {
     u32 x;
     u32 y;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct PCG32
 {
     u32 seed;
     u32 low;
     u32 high;
-};
+} GBA_STRUCT_LAYOUT;
 
 #include "rogue.h"
 
@@ -215,7 +215,7 @@ struct Time
     /*0x02*/ s8 hours;
     /*0x03*/ s8 minutes;
     /*0x04*/ s8 seconds;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct Pokedex
 {
@@ -226,7 +226,7 @@ struct Pokedex
     /*0x04*/ u32 unownPersonality; // set when you first see Unown
     /*0x08*/ u32 spindaPersonality; // set when you first see Spinda
     /*0x0C*/ u32 unknown3;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct PokemonJumpRecords
 {
@@ -236,7 +236,7 @@ struct PokemonJumpRecords
     u16 gamesWithMaxPlayers;
     u32 unused2; // Set to 0, never read
     u32 bestJumpScore;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct BerryPickingResults
 {
@@ -251,27 +251,27 @@ struct BerryPickingResults
     u8 field_D;
     u8 field_E;
     u8 field_F;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct PyramidBag
 {
     u16 itemId[FRONTIER_LVL_MODE_COUNT][PYRAMID_BAG_ITEMS_COUNT];
     u8 quantity[FRONTIER_LVL_MODE_COUNT][PYRAMID_BAG_ITEMS_COUNT];
-};
+} GBA_STRUCT_LAYOUT;
 
 struct BerryCrush
 {
     u16 pressingSpeeds[4]; // For the record with each possible group size, 2-5 players
     u32 berryPowderAmount;
     u32 unk;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct ApprenticeMon
 {
     u16 species;
     u16 moves[MAX_MON_MOVES];
     u16 item;
-};
+} GBA_STRUCT_LAYOUT;
 
 // This is for past players Apprentices or Apprentices received via Record Mix.
 // For the current Apprentice, see struct PlayersApprentice
@@ -289,7 +289,7 @@ struct Apprentice
     u8 playerName[PLAYER_NAME_LENGTH];
     u8 language;
     u32 checksum;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct BattleTowerPokemon
 {
@@ -316,7 +316,7 @@ struct BattleTowerPokemon
     u32 personality;
     u8 nickname[POKEMON_NAME_LENGTH + 1];
     u8 friendship;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct EmeraldBattleTowerRecord
 {
@@ -332,7 +332,7 @@ struct EmeraldBattleTowerRecord
     /*0xE4*/ u8 language;
     /*0xE7*/ //u8 padding[3];
     /*0xE8*/ u32 checksum;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct BattleTowerInterview
 {
@@ -341,7 +341,7 @@ struct BattleTowerInterview
     u8 opponentName[PLAYER_NAME_LENGTH + 1];
     u8 opponentMonNickname[POKEMON_NAME_LENGTH + 1];
     u8 opponentLanguage;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct BattleTowerEReaderTrainer
 {
@@ -355,7 +355,7 @@ struct BattleTowerEReaderTrainer
     /*0x28*/ u16 farewellPlayerWon[EASY_CHAT_BATTLE_WORDS_COUNT];
     /*0x34*/ struct BattleTowerPokemon party[FRONTIER_PARTY_SIZE];
     /*0xB8*/ u32 checksum;
-};
+} GBA_STRUCT_LAYOUT;
 
 // For displaying party information on the player's Battle Dome tourney page
 struct DomeMonData
@@ -364,7 +364,7 @@ struct DomeMonData
     u8 evs[NUM_STATS];
     u8 nature;
     //u8 padding;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RentalMon
 {
@@ -374,7 +374,7 @@ struct RentalMon
     u8 ivs;
     u8 abilityNum;
     //u8 padding2[2];
-};
+} GBA_STRUCT_LAYOUT;
 
 struct BattleDomeTrainer
 {
@@ -382,7 +382,7 @@ struct BattleDomeTrainer
     u16 isEliminated:1;
     u16 eliminatedAt:2;
     u16 forfeited:3;
-};
+} GBA_STRUCT_LAYOUT;
 
 #define DOME_TOURNAMENT_TRAINERS_COUNT 16
 #define BATTLE_TOWER_RECORD_COUNT 5
@@ -470,7 +470,7 @@ struct BattleFrontier
     /*0xEFA*/ u8 unused_EFA;
     /*0xEFB*/ u8 unused_EFB;
     /*0xEFC*/ struct DomeMonData domePlayerPartyData[FRONTIER_PARTY_SIZE];
-};
+} GBA_STRUCT_LAYOUT;
 
 struct ApprenticeQuestion
 {
@@ -480,7 +480,7 @@ struct ApprenticeQuestion
     u8 suggestedChange:2; // TRUE if told to use held item or second move, FALSE if told to use no item or first move
     //u8 padding;
     u16 data; // used both as an itemId and a moveId
-};
+} GBA_STRUCT_LAYOUT;
 
 struct PlayersApprentice
 {
@@ -495,7 +495,7 @@ struct PlayersApprentice
     /*0xB4*/ u8 speciesIds[MULTI_PARTY_SIZE];
     /*0xB7*/ //u8 padding2;
     /*0xB8*/ struct ApprenticeQuestion questions[APPRENTICE_MAX_QUESTIONS];
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RankingHall1P
 {
@@ -504,7 +504,7 @@ struct RankingHall1P
     u8 name[PLAYER_NAME_LENGTH + 1];
     u8 language;
     //u8 padding;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RankingHall2P
 {
@@ -515,7 +515,7 @@ struct RankingHall2P
     u8 name2[PLAYER_NAME_LENGTH + 1];
     u8 language;
     //u8 padding;
-};
+} GBA_STRUCT_LAYOUT;
 
 // follow me
 struct FollowerMapData
@@ -523,7 +523,7 @@ struct FollowerMapData
     /*0x0*/ u8 id;
     /*0x1*/ u8 number;
     /*0x2*/ u8 group;
-}; /* size = 0x4 */
+} GBA_STRUCT_LAYOUT; /* size = 0x4 */
 struct Follower
 {
     /*0x00*/ u8 inProgress:1;
@@ -540,7 +540,7 @@ struct Follower
     /*0x12*/ u16 graphicsId;
     /*0x14*/ u16 flags;
     /*0x15*/ u8 locked;
-}; /* size = 0x18 */
+} GBA_STRUCT_LAYOUT; /* size = 0x18 */
 
 struct SaveBlock2
 {
@@ -592,7 +592,7 @@ struct SaveBlock2
     /*0x64C*/ struct BattleFrontier frontier;
     /*0xF2C*/ struct Follower follower;
               u8 pokemonHubName[POKEMON_HUB_NAME_LENGTH + 1];
-}; // sizeof=0xF2C
+} GBA_STRUCT_LAYOUT; // sizeof=0xF2C
 
 extern struct SaveBlock2 *gSaveBlock2Ptr;
 
@@ -604,7 +604,7 @@ struct SecretBaseParty
     u16 heldItems[PARTY_SIZE];
     u8 levels[PARTY_SIZE];
     u8 EVs[PARTY_SIZE];
-};
+} GBA_STRUCT_LAYOUT;
 
 struct SecretBase
 {
@@ -623,7 +623,7 @@ struct SecretBase
     /*0x1ABE*/ u8 decorationPositions[DECOR_MAX_SECRET_BASE];
     /*0x1ACE*/ //u8 padding[2];
     /*0x1AD0*/ struct SecretBaseParty party;
-};
+} GBA_STRUCT_LAYOUT;
 
 #include "constants/game_stat.h"
 #include "global.fieldmap.h"
@@ -638,13 +638,13 @@ struct WarpData
     s8 warpId;
     //u8 padding;
     s16 x, y;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct ItemSlot
 {
     u16 itemId;
     u16 quantity;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct Pokeblock
 {
@@ -655,7 +655,7 @@ struct Pokeblock
     u8 bitter;
     u8 sour;
     u8 feel;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RamScriptData
 {
@@ -665,13 +665,13 @@ struct RamScriptData
     u8 objectId;
     u8 script[995];
     //u8 padding;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RamScript
 {
     u32 checksum;
     struct RamScriptData data;
-};
+} GBA_STRUCT_LAYOUT;
 
 // See dewford_trend.c
 struct DewfordTrend
@@ -682,12 +682,12 @@ struct DewfordTrend
     //u16 padding:1;
     u16 rand;
     u16 words[2];
-}; /*size = 0x8*/
+} GBA_STRUCT_LAYOUT; /*size = 0x8*/
 
 struct MauvilleManCommon
 {
     u8 id;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct MauvilleManBard
 {
@@ -701,7 +701,7 @@ struct MauvilleManBard
     /*0x29*/ bool8 hasChangedSong;
     /*0x2A*/ u8 language;
     /*0x2B*/ //u8 padding2;
-}; /*size = 0x2C*/
+} GBA_STRUCT_LAYOUT; /*size = 0x2C*/
 
 struct MauvilleManStoryteller
 {
@@ -712,7 +712,7 @@ struct MauvilleManStoryteller
     u8 trainerNames[NUM_STORYTELLER_TALES][PLAYER_NAME_LENGTH];
     u8 statValues[NUM_STORYTELLER_TALES][4];
     u8 language[NUM_STORYTELLER_TALES];
-};
+} GBA_STRUCT_LAYOUT;
 
 struct MauvilleManGiddy
 {
@@ -724,14 +724,14 @@ struct MauvilleManGiddy
     /*0x18*/ u8 questionList[GIDDY_MAX_QUESTIONS];
     /*0x20*/ u8 language;
     /*0x21*/ //u8 padding2;
-}; /*size = 0x2C*/
+} GBA_STRUCT_LAYOUT; /*size = 0x2C*/
 
 struct MauvilleManHipster
 {
     u8 id;
     bool8 taughtWord;
     u8 language;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct MauvilleOldManTrader
 {
@@ -740,7 +740,7 @@ struct MauvilleOldManTrader
     u8 playerNames[NUM_TRADER_ITEMS][11];
     u8 alreadyTraded;
     u8 language[NUM_TRADER_ITEMS];
-};
+} GBA_STRUCT_LAYOUT;
 
 typedef union OldMan
 {
@@ -751,7 +751,7 @@ typedef union OldMan
     struct MauvilleOldManTrader trader;
     struct MauvilleManStoryteller storyteller;
     u8 filler[0x40];
-} OldMan;
+} GBA_STRUCT_LAYOUT OldMan;
 
 #define LINK_B_RECORDS_COUNT 5
 
@@ -762,14 +762,14 @@ struct LinkBattleRecord
     u16 wins;
     u16 losses;
     u16 draws;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct LinkBattleRecords
 {
     struct LinkBattleRecord entries[LINK_B_RECORDS_COUNT];
     u8 languages[LINK_B_RECORDS_COUNT];
     //u8 padding;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RecordMixingGiftData
 {
@@ -777,13 +777,13 @@ struct RecordMixingGiftData
     u8 quantity;
     u16 itemId;
     u8 filler4[8];
-};
+} GBA_STRUCT_LAYOUT;
 
 struct RecordMixingGift
 {
     int checksum;
     struct RecordMixingGiftData data;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct Mail
 {
@@ -792,7 +792,7 @@ struct Mail
     /*0x1A*/ u8 trainerId[TRAINER_ID_LENGTH];
     /*0x1E*/ u16 species;
     /*0x20*/ u16 itemId;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct DaycareMail
 {
@@ -801,14 +801,14 @@ struct DaycareMail
     u8 monName[POKEMON_NAME_LENGTH + 1];
     u8 gameLanguage:4;
     u8 monLanguage:4;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct DaycareMon
 {
     struct BoxPokemon mon;
     struct DaycareMail mail;
     u32 steps;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct DayCare
 {
@@ -816,7 +816,7 @@ struct DayCare
     u32 offspringPersonality;
     u8 stepCounter;
     //u8 padding[3];
-};
+} GBA_STRUCT_LAYOUT;
 
 struct LilycoveLadyQuiz
 {
@@ -832,7 +832,7 @@ struct LilycoveLadyQuiz
     /*0x02B*/ u8 questionId;
     /*0x02C*/ u8 prevQuestionId;
     /*0x02D*/ u8 language;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct LilycoveLadyFavor
 {
@@ -847,7 +847,7 @@ struct LilycoveLadyFavor
     /*0x010*/ u16 bestItem;
     /*0x012*/ u8 language;
     /*0x013*/ //u8 padding2;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct LilycoveLadyContest
 {
@@ -859,7 +859,7 @@ struct LilycoveLadyContest
     /*0x00C*/ u8 maxSheen;
     /*0x00D*/ u8 category;
     /*0x00E*/ u8 language;
-};
+} GBA_STRUCT_LAYOUT;
 
 typedef union // 3b58
 {
@@ -878,13 +878,13 @@ struct WaldaPhrase
     u8 patternId;
     bool8 patternUnlocked;
     //u8 padding;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct TrainerNameRecord
 {
     u32 trainerId;
     u8 ALIGNED(2) trainerName[PLAYER_NAME_LENGTH + 1];
-};
+} GBA_STRUCT_LAYOUT;
 
 struct WonderNewsMetadata
 {
@@ -893,7 +893,7 @@ struct WonderNewsMetadata
     u8 rewardCounter:3;
     u8 berry;
     //u8 padding[2];
-};
+} GBA_STRUCT_LAYOUT;
 
 struct WonderNews
 {
@@ -902,7 +902,7 @@ struct WonderNews
     u8 bgType;
     u8 titleText[WONDER_NEWS_TEXT_LENGTH];
     u8 bodyText[WONDER_NEWS_BODY_TEXT_LINES][WONDER_NEWS_TEXT_LENGTH];
-};
+} GBA_STRUCT_LAYOUT;
 
 struct WonderCard
 {
@@ -919,7 +919,7 @@ struct WonderCard
     u8 footerLine1Text[WONDER_CARD_TEXT_LENGTH];
     u8 footerLine2Text[WONDER_CARD_TEXT_LENGTH];
     //u8 padding[2];
-};
+} GBA_STRUCT_LAYOUT;
 
 struct WonderCardMetadata
 {
@@ -928,7 +928,7 @@ struct WonderCardMetadata
     u16 numTrades;
     u16 iconSpecies;
     u16 stampData[2][MAX_STAMP_CARD_STAMPS]; // First element is STAMP_SPECIES, second is STAMP_ID
-};
+} GBA_STRUCT_LAYOUT;
 
 struct MysteryGiftSave
 {
@@ -941,7 +941,7 @@ struct MysteryGiftSave
     u16 questionnaireWords[NUM_QUESTIONNAIRE_WORDS];
     struct WonderNewsMetadata newsMetadata;
     u32 trainerIds[2][5]; // Saved ids for 10 trainers, 5 each for battles and trades
-}; // 0x36C 0x3598
+} GBA_STRUCT_LAYOUT; // 0x36C 0x3598
 
 // For external event data storage. The majority of these may have never been used.
 // In Emerald, the only known used fields are the PokeCoupon and BoxRS ones, but hacking the distribution discs allows Emerald to receive events and set the others
@@ -1057,7 +1057,7 @@ struct SaveBlock1
     /*0x3C88*/ u8 registeredTexts[UNION_ROOM_KB_ROW_COUNT][21];
     /*0x3D70*/ struct WaldaPhrase waldaPhrase;
     // sizeof: 0x3D88
-};
+} GBA_STRUCT_LAYOUT;
 
 extern struct SaveBlock1* gSaveBlock1Ptr;
 
@@ -1066,6 +1066,6 @@ struct MapPosition
     s16 x;
     s16 y;
     s8 elevation;
-};
+} GBA_STRUCT_LAYOUT;
 
 #endif // GUARD_GLOBAL_H
