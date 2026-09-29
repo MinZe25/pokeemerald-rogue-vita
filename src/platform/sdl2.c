@@ -824,7 +824,7 @@ static void HandleFrontendRequest(int request)
         if (!Savestate_Exists(Frontend_StatePath()))
             snprintf(msg, sizeof(msg), "State %d is empty", Frontend_StateSlot());
         else
-            snprintf(msg, sizeof(msg), Savestate_Load(Frontend_StatePath()) ? "State %d loaded" : "State %d is not compatible", Frontend_StateSlot());
+            snprintf(msg, sizeof(msg), Savestate_Load(Frontend_StatePath()) ? "State %d loaded" : "State %d is from another build", Frontend_StateSlot());
         Frontend_ShowMessage(msg);
         break;
     case FE_REQUEST_RESET:
