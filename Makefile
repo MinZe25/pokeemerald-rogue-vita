@@ -671,21 +671,44 @@ VITA_TITLE := Pokemon Emerald Rogue
 VITA_TITLEID := PKMR00001
 endif
 
+# Game objects are merged into one relocatable object whose .data/.bss are
+# renamed so the platform layer can snapshot all game state (save states,
+# resets). The platform side (SDL, menu) stays outside. Needs ELF (__start_/
+# __stop_ symbols), so Windows links as before.
+PLATFORM_SIDE_OBJS := src/platform/sdl2.o src/platform/frontend.o src/platform/savestate.o
+GAME_SIDE_OBJS = $(filter-out $(PLATFORM_SIDE_OBJS),$(OBJS_REL))
+ifeq ($(TARGET_OS),WINDOWS)
+LINK_OBJS = $(OBJS_REL)
+PRELINK = true
+else
+LINK_OBJS = game_combined.o $(PLATFORM_SIDE_OBJS)
+ifeq ($(TARGET_OS),VITA)
+LD_R := $(PREFIX)ld -r -d
+else
+LD_R := ld -m elf_i386 -r -d
+endif
+PRELINK = $(LD_R) -o game_combined.o $(GAME_SIDE_OBJS) && $(OBJCOPY) --rename-section .data=gamedata --rename-section .bss=gamebss game_combined.o
+endif
+
 $(OBJ_DIR)/res.o: $(C_SUBDIR)/platform/win32res/res.rc $(C_SUBDIR)/platform/win32res/icon.ico
 	$(PREFIX)windres $< -o $@
 
 $(ROM): $(OBJS)
 ifeq ($(TARGET_OS),VITA)
 	@echo "$(MODERNCC) <objects> $(PC_LIBS) -o $(OBJ_DIR)/eboot.elf"
-	@cd $(OBJ_DIR) && bash ../../tools/pc/vita_link.sh eboot.elf $(MODERNCC) $(HOST_ARCH_FLAGS) $(OBJS_REL) $(PC_LIBS)
+	@cd $(OBJ_DIR) && $(PRELINK) && bash ../../tools/pc/vita_link.sh eboot.elf $(MODERNCC) $(HOST_ARCH_FLAGS) $(LINK_OBJS) $(PC_LIBS)
 	vita-elf-create $(OBJ_DIR)/eboot.elf $(OBJ_DIR)/eboot.velf
 	vita-make-fself -c -s $(OBJ_DIR)/eboot.velf $(OBJ_DIR)/eboot.bin
 	vita-mksfoex -s TITLE_ID=$(VITA_TITLEID) "$(VITA_TITLE)" $(OBJ_DIR)/param.sfo
 	vita-pack-vpk -s $(OBJ_DIR)/param.sfo -b $(OBJ_DIR)/eboot.bin \
-		-a $(C_SUBDIR)/platform/vita/icon0.png=sce_sys/icon0.png $@
+		-a $(C_SUBDIR)/platform/vita/icon0.png=sce_sys/icon0.png \
+		-a $(C_SUBDIR)/platform/vita/pic0.png=sce_sys/pic0.png \
+		-a $(C_SUBDIR)/platform/vita/livearea/bg.png=sce_sys/livearea/contents/bg.png \
+		-a $(C_SUBDIR)/platform/vita/livearea/startup.png=sce_sys/livearea/contents/startup.png \
+		-a $(C_SUBDIR)/platform/vita/livearea/template.xml=sce_sys/livearea/contents/template.xml $@
 else
 	@echo "$(MODERNCC) $(HOST_ARCH_FLAGS) <objects> $(PC_LIBS) -o $@"
-	@cd $(OBJ_DIR) && $(MODERNCC) $(HOST_ARCH_FLAGS) $(OBJS_REL) $(patsubst -L%,-L../../%,$(PC_LIBS)) -o ../../$@
+	@cd $(OBJ_DIR) && $(PRELINK) && $(MODERNCC) $(HOST_ARCH_FLAGS) $(LINK_OBJS) $(patsubst -L%,-L../../%,$(PC_LIBS)) -o ../../$@
 endif
 	@echo "Built $@"
 else

@@ -17,6 +17,7 @@
 #include <psp2/power.h>
 #include <psp2/io/stat.h>
 #include <psp2/kernel/processmgr.h>
+#include <psp2/touch.h>
 
 // Rogue's code can use a fair amount of stack; the default is 256KB
 int sceUserMainThreadStackSize = 4 * 1024 * 1024;
@@ -38,6 +39,9 @@ unsigned int _newlib_heap_size_user = 128 * 1024 * 1024;
 #include "platform/dma.h"
 #include "platform/framedraw.h"
 #include "platform/system.h"
+#include "platform/frontend.h"
+#include "platform/savestate.h"
+#include <setjmp.h>
 
 extern void (*const gIntrTable[])(void);
 
@@ -60,6 +64,15 @@ double timeScale = 1.0;
 struct SiiRtcInfo internalClock;
 
 static FILE *sSaveFile = NULL;
+static uint32_t sPhysButtons;      // physical buttons held this frame
+static bool sMenuRequested;
+static jmp_buf sResetJump;
+static bool sResetJumpValid;
+static uint16_t sMenuFrame[DISPLAY_WIDTH * DISPLAY_HEIGHT];
+static void ReadPhysButtons(void);
+static void PresentFrame(void);
+static void RestartGame(void);
+static void HandleFrontendRequest(int request);
 #ifdef __vita__
 static SDL_AudioStream *sAudioStream = NULL;
 #endif
@@ -131,6 +144,7 @@ extern void Harness_EnableFollower(void);
 extern void Harness_SoundTestFrame(unsigned long t);
 static unsigned long sSoundTestFrame = 0;
 static unsigned long sFollowFrame = 0;
+static unsigned long sSaveStateFrame, sLoadStateFrame, sResetFrame, sMenuFrameAt;
 static const char *sDumpList = NULL;
 static const char *sInputScript = NULL;
 static uint16_t sFrameImage[DISPLAY_WIDTH * DISPLAY_HEIGHT];
@@ -305,6 +319,10 @@ static void InitTestHarness(void)
     if ((v = getenv("ROGUE_DUMPEVERY")) != NULL)
         sDumpEvery = strtoul(v, NULL, 10);
     sDumpList = getenv("ROGUE_DUMP");
+    if ((v = getenv("ROGUE_SAVESTATE")) != NULL) sSaveStateFrame = strtoul(v, NULL, 10);
+    if ((v = getenv("ROGUE_LOADSTATE")) != NULL) sLoadStateFrame = strtoul(v, NULL, 10);
+    if ((v = getenv("ROGUE_RESET")) != NULL) sResetFrame = strtoul(v, NULL, 10);
+    if ((v = getenv("ROGUE_MENU")) != NULL) sMenuFrameAt = strtoul(v, NULL, 10);
     if ((v = getenv("ROGUE_SOUNDTEST")) != NULL)
         sSoundTestFrame = strtoul(v, NULL, 10);
     if ((v = getenv("ROGUE_FOLLOW")) != NULL)
@@ -332,6 +350,11 @@ static bool RunGameFrame(bool draw)
     ENTER_VBLANK(); //you must be in VBlank before running a game tick
     if (sBattleFrame != 0 && sFrameCount == sBattleFrame)
         Harness_StartTestBattle();
+    // harness: exercise the frontend features at given frames
+    if (sSaveStateFrame && sFrameCount == sSaveStateFrame) HandleFrontendRequest(FE_REQUEST_SAVE_STATE);
+    if (sLoadStateFrame && sFrameCount == sLoadStateFrame) HandleFrontendRequest(FE_REQUEST_LOAD_STATE);
+    if (sResetFrame && sFrameCount == sResetFrame) HandleFrontendRequest(FE_REQUEST_RESET);
+    if (sMenuFrameAt && sFrameCount == sMenuFrameAt) { Frontend_OpenMenu(sFrameImage); Frontend_DrawMenu(sMenuFrame); memcpy(sFrameImage, sMenuFrame, sizeof(sMenuFrame)); DumpFrame(sFrameCount); Frontend_UpdateMenu(0); Frontend_UpdateMenu(PHYS_CIRCLE); }
     if (sSoundTestFrame != 0 && sFrameCount >= sSoundTestFrame)
         Harness_SoundTestFrame(sFrameCount - sSoundTestFrame);
     if (sFollowFrame != 0 && sFrameCount == sFollowFrame)
@@ -387,12 +410,14 @@ int main(int argc, char **argv)
     sceIoMkdir("ux0:data", 0777);
     sceIoMkdir(DATA_DIR, 0777);
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
+    sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
     PlatformLog("pokeemerald_rogue starting (cpu %d MHz, bus %d MHz, gpu %d MHz)\n",
                 scePowerGetArmClockFrequency(), scePowerGetBusClockFrequency(), scePowerGetGpuClockFrequency());
 #endif
 
     InitTestHarness();
-    ReadSaveFile(getenv("ROGUE_SAVEFILE") != NULL ? (char *)getenv("ROGUE_SAVEFILE") : SAVE_PATH);
+    Frontend_Init(DATA_DIR);
+    ReadSaveFile(getenv("ROGUE_SAVEFILE") != NULL ? (char *)getenv("ROGUE_SAVEFILE") : (char *)Frontend_SavePath());
 
     if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0)
     {
@@ -465,8 +490,15 @@ int main(int argc, char **argv)
     }
 
     PlatformLog("SDL ready, starting game\n");
+    // Power-on state of all game memory, used for resets and switching save files
+    Savestate_TakeBootSnapshot();
     AgbMain();
     PlatformLog("AgbMain done\n");
+
+    // The game's SoftReset() jumps back here from wherever it was called
+    if (setjmp(sResetJump) != 0)
+        RestartGame();
+    sResetJumpValid = true;
 
     double accumulator = 0.0;
 
@@ -480,6 +512,37 @@ int main(int argc, char **argv)
         double deltaTime;
 
         ProcessEvents();
+        ReadPhysButtons();
+
+        if (sMenuRequested && !Frontend_MenuIsOpen() && !sHeadless)
+        {
+            Frontend_OpenMenu(sFrameImage);
+            SDL_PauseAudio(1);
+        }
+        sMenuRequested = false;
+
+        if (Frontend_MenuIsOpen())
+        {
+            int request = Frontend_UpdateMenu(sPhysButtons);
+
+            if (Frontend_MenuIsOpen())
+            {
+                Frontend_DrawMenu(sMenuFrame);
+                SDL_UpdateTexture(sdlTexture, NULL, sMenuFrame, DISPLAY_WIDTH * sizeof(Uint16));
+            }
+            else
+            {
+                SDL_UpdateTexture(sdlTexture, NULL, sFrameImage, DISPLAY_WIDTH * sizeof(Uint16));
+                HandleFrontendRequest(request);
+                SDL_ClearQueuedAudio(1);
+                SDL_PauseAudio(0);
+            }
+            // don't let the time spent in the menu be caught up afterwards
+            accumulator = 0.0;
+            lastGameTime = SDL_GetPerformanceCounter();
+            PresentFrame();
+            continue;
+        }
 
         curGameTime = SDL_GetPerformanceCounter();
         deltaTime = (double)((curGameTime - lastGameTime) / (double)SDL_GetPerformanceFrequency());
@@ -537,18 +600,7 @@ int main(int argc, char **argv)
 
         lastGameTime = curGameTime;
 
-#ifdef __vita__
-        {
-            // 3x integer scale, centred on the 960x544 screen
-            SDL_Rect dst = { (960 - DISPLAY_WIDTH * 3) / 2, (544 - DISPLAY_HEIGHT * 3) / 2, DISPLAY_WIDTH * 3, DISPLAY_HEIGHT * 3 };
-            SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, 255);
-            SDL_RenderClear(sdlRenderer);
-            SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, &dst);
-        }
-#else
-        SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, NULL);
-#endif
-        SDL_RenderPresent(sdlRenderer);
+        PresentFrame();
     }
 
     CloseSaveFile();
@@ -665,26 +717,90 @@ static void CloseSaveFile()
     if (sSaveFile != NULL)
     {
         fclose(sSaveFile);
+        sSaveFile = NULL;
     }
 }
 
-// Key mappings
-#define KEY_A_BUTTON      SDLK_z
-#define KEY_B_BUTTON      SDLK_x
-#define KEY_START_BUTTON  SDLK_RETURN
-#define KEY_SELECT_BUTTON SDLK_BACKSLASH
-#define KEY_L_BUTTON      SDLK_a
-#define KEY_R_BUTTON      SDLK_s
-#define KEY_DPAD_UP       SDLK_UP
-#define KEY_DPAD_DOWN     SDLK_DOWN
-#define KEY_DPAD_LEFT     SDLK_LEFT
-#define KEY_DPAD_RIGHT    SDLK_RIGHT
+static void PresentFrame(void)
+{
+    SDL_SetTextureScaleMode(sdlTexture, gFrontendConfig.smoothFilter ? SDL_ScaleModeLinear : SDL_ScaleModeNearest);
+#ifdef __vita__
+    {
+        SDL_Rect dst;
+        Frontend_GetDestRect(960, 544, &dst.x, &dst.y, &dst.w, &dst.h);
+        SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, 255);
+        SDL_RenderClear(sdlRenderer);
+        SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, &dst);
+    }
+#else
+    SDL_RenderCopy(sdlRenderer, sdlTexture, NULL, NULL);
+#endif
+    SDL_RenderPresent(sdlRenderer);
+}
 
-#define HANDLE_KEYUP(key) \
-case KEY_##key:  keys &= ~key; break;
+// Power-cycles the game: all game memory back to its boot state, then the
+// save file (which may have changed) is loaded again
+static void RestartGame(void)
+{
+    SDL_ClearQueuedAudio(1);
+    if (!Savestate_RestoreBootSnapshot())
+    {
+        PlatformLog("Reset not supported on this platform, exiting\n");
+        exit(0);
+    }
+    CloseSaveFile();
+    ReadSaveFile((char *)Frontend_SavePath());
+    memset(sFrameImage, 0, sizeof(sFrameImage));
+    AgbMain();
+}
 
-#define HANDLE_KEYDOWN(key) \
-case KEY_##key:  keys |= key; break;
+static void HandleFrontendRequest(int request)
+{
+    char msg[40];
+
+    switch (request)
+    {
+    case FE_REQUEST_SAVE_STATE:
+        snprintf(msg, sizeof(msg), Savestate_Save(Frontend_StatePath()) ? "State %d saved" : "Saving state %d failed", Frontend_StateSlot());
+        Frontend_ShowMessage(msg);
+        break;
+    case FE_REQUEST_LOAD_STATE:
+        if (!Savestate_Exists(Frontend_StatePath()))
+            snprintf(msg, sizeof(msg), "State %d is empty", Frontend_StateSlot());
+        else
+            snprintf(msg, sizeof(msg), Savestate_Load(Frontend_StatePath()) ? "State %d loaded" : "State %d is not compatible", Frontend_StateSlot());
+        Frontend_ShowMessage(msg);
+        break;
+    case FE_REQUEST_RESET:
+        RestartGame();
+        break;
+    case FE_REQUEST_SWITCH_SAVE_FILE:
+        RestartGame();
+        snprintf(msg, sizeof(msg), "Save file %d", gFrontendConfig.saveFile);
+        Frontend_ShowMessage(msg);
+        break;
+    case FE_REQUEST_QUIT:
+        isRunning = false;
+        break;
+    }
+}
+
+// Keyboard -> physical buttons (remappable to GBA buttons in the menu)
+static const struct { SDL_Keycode key; uint32_t phys; } sKeyboardMap[] = {
+    { SDLK_z, PHYS_CROSS }, { SDLK_x, PHYS_CIRCLE }, { SDLK_c, PHYS_SQUARE }, { SDLK_SPACE, PHYS_TRIANGLE },
+    { SDLK_a, PHYS_L }, { SDLK_s, PHYS_R }, { SDLK_RETURN, PHYS_START }, { SDLK_BACKSLASH, PHYS_SELECT },
+    { SDLK_BACKSPACE, PHYS_SELECT }, { SDLK_UP, PHYS_UP }, { SDLK_DOWN, PHYS_DOWN },
+    { SDLK_LEFT, PHYS_LEFT }, { SDLK_RIGHT, PHYS_RIGHT },
+};
+static uint32_t sKeyboardPhys;
+
+static uint32_t KeyToPhys(SDL_Keycode key)
+{
+    for (unsigned i = 0; i < sizeof(sKeyboardMap) / sizeof(sKeyboardMap[0]); i++)
+        if (sKeyboardMap[i].key == key)
+            return sKeyboardMap[i].phys;
+    return 0;
+}
 
 static u16 keys;
 
@@ -700,61 +816,23 @@ void ProcessEvents(void)
             isRunning = false;
             break;
         case SDL_KEYUP:
-            switch (event.key.keysym.sym)
-            {
-            HANDLE_KEYUP(A_BUTTON)
-            HANDLE_KEYUP(B_BUTTON)
-            HANDLE_KEYUP(START_BUTTON)
-            HANDLE_KEYUP(SELECT_BUTTON)
-            HANDLE_KEYUP(L_BUTTON)
-            HANDLE_KEYUP(R_BUTTON)
-            HANDLE_KEYUP(DPAD_UP)
-            HANDLE_KEYUP(DPAD_DOWN)
-            HANDLE_KEYUP(DPAD_LEFT)
-            HANDLE_KEYUP(DPAD_RIGHT)
-            case SDLK_SPACE:
-                if (speedUp)
-                {
-                    speedUp = false;
-                    timeScale = 1.0;
-                    //SDL_ClearQueuedAudio(1);
-                    //SDL_PauseAudio(0);
-                }
-                break;
-            }
+            sKeyboardPhys &= ~KeyToPhys(event.key.keysym.sym);
             break;
         case SDL_KEYDOWN:
+            sKeyboardPhys |= KeyToPhys(event.key.keysym.sym);
             switch (event.key.keysym.sym)
             {
-            HANDLE_KEYDOWN(A_BUTTON)
-            HANDLE_KEYDOWN(B_BUTTON)
-            HANDLE_KEYDOWN(START_BUTTON)
-            HANDLE_KEYDOWN(SELECT_BUTTON)
-            HANDLE_KEYDOWN(L_BUTTON)
-            HANDLE_KEYDOWN(R_BUTTON)
-            HANDLE_KEYDOWN(DPAD_UP)
-            HANDLE_KEYDOWN(DPAD_DOWN)
-            HANDLE_KEYDOWN(DPAD_LEFT)
-            HANDLE_KEYDOWN(DPAD_RIGHT)
+            case SDLK_F1:
+            case SDLK_ESCAPE:
+                sMenuRequested = true;
+                break;
             case SDLK_r:
                 if (event.key.keysym.mod & (KMOD_LCTRL | KMOD_RCTRL))
-                {
                     DoSoftReset();
-                }
                 break;
             case SDLK_p:
                 if (event.key.keysym.mod & (KMOD_LCTRL | KMOD_RCTRL))
-                {
                     paused = !paused;
-                }
-                break;
-            case SDLK_SPACE:
-                if (!speedUp)
-                {
-                    speedUp = true;
-                    timeScale = 5.0;
-                    //SDL_PauseAudio(1);
-                }
                 break;
             }
             break;
@@ -837,41 +915,67 @@ u16 GetXInputKeys()
 #endif // _WIN32
 
 #ifdef __vita__
-// Cross=A, Circle=B, L/R triggers, Start/Select, d-pad or left stick; hold Triangle to fast-forward
-static u16 GetVitaKeys(void)
+static uint32_t GetVitaPhys(void)
 {
+    static bool sWasTouching;
     SceCtrlData pad;
-    u16 k = 0;
+    SceTouchData touch;
+    uint32_t p = 0;
 
-    if (sceCtrlPeekBufferPositive(0, &pad, 1) < 0)
-        return 0;
-    if (pad.buttons & SCE_CTRL_CROSS)    k |= A_BUTTON;
-    if (pad.buttons & SCE_CTRL_CIRCLE)   k |= B_BUTTON;
-    if (pad.buttons & SCE_CTRL_START)    k |= START_BUTTON;
-    if (pad.buttons & SCE_CTRL_SELECT)   k |= SELECT_BUTTON;
-    if (pad.buttons & SCE_CTRL_LTRIGGER) k |= L_BUTTON;
-    if (pad.buttons & SCE_CTRL_RTRIGGER) k |= R_BUTTON;
-    if ((pad.buttons & SCE_CTRL_UP)    || pad.ly < 64)  k |= DPAD_UP;
-    if ((pad.buttons & SCE_CTRL_DOWN)  || pad.ly > 192) k |= DPAD_DOWN;
-    if ((pad.buttons & SCE_CTRL_LEFT)  || pad.lx < 64)  k |= DPAD_LEFT;
-    if ((pad.buttons & SCE_CTRL_RIGHT) || pad.lx > 192) k |= DPAD_RIGHT;
-    timeScale = (pad.buttons & SCE_CTRL_TRIANGLE) ? 3.0 : 1.0;
-    return k;
+    if (sceCtrlPeekBufferPositive(0, &pad, 1) >= 0)
+    {
+        if (pad.buttons & SCE_CTRL_CROSS)    p |= PHYS_CROSS;
+        if (pad.buttons & SCE_CTRL_CIRCLE)   p |= PHYS_CIRCLE;
+        if (pad.buttons & SCE_CTRL_SQUARE)   p |= PHYS_SQUARE;
+        if (pad.buttons & SCE_CTRL_TRIANGLE) p |= PHYS_TRIANGLE;
+        if (pad.buttons & SCE_CTRL_START)    p |= PHYS_START;
+        if (pad.buttons & SCE_CTRL_SELECT)   p |= PHYS_SELECT;
+        if (pad.buttons & SCE_CTRL_LTRIGGER) p |= PHYS_L;
+        if (pad.buttons & SCE_CTRL_RTRIGGER) p |= PHYS_R;
+        if ((pad.buttons & SCE_CTRL_UP)    || pad.ly < 64)  p |= PHYS_UP;
+        if ((pad.buttons & SCE_CTRL_DOWN)  || pad.ly > 192) p |= PHYS_DOWN;
+        if ((pad.buttons & SCE_CTRL_LEFT)  || pad.lx < 64)  p |= PHYS_LEFT;
+        if ((pad.buttons & SCE_CTRL_RIGHT) || pad.lx > 192) p |= PHYS_RIGHT;
+    }
+    // tapping the front screen opens the menu (the game never uses touch)
+    if (sceTouchPeek(SCE_TOUCH_PORT_FRONT, &touch, 1) >= 0)
+    {
+        bool touching = touch.reportNum > 0;
+        if (touching && !sWasTouching && gFrontendConfig.touchOpensMenu)
+            sMenuRequested = true;
+        sWasTouching = touching;
+    }
+    return p;
 }
 #endif
+
+static void ReadPhysButtons(void)
+{
+#ifdef __vita__
+    sPhysButtons = GetVitaPhys();
+#else
+    sPhysButtons = sKeyboardPhys;
+#endif
+    if (Frontend_MenuButtonPressed(sPhysButtons))
+        sMenuRequested = true;
+}
 
 u16 Platform_GetKeyInput(void)
 {
     u16 scripted = (sInputScript != NULL) ? GetScriptedKeys(sFrameCount) : 0;
-#ifdef __vita__
-    return GetVitaKeys() | scripted;
-#endif
+    u16 mapped = 0;
+
+    if (!Frontend_MenuIsOpen())
+    {
+        mapped = Frontend_MapButtons(sPhysButtons);
+        timeScale = Frontend_FastForwardHeld(sPhysButtons) ? gFrontendConfig.fastForwardSpeed : 1.0;
+    }
 #ifdef _WIN32
     u16 gamepadKeys = GetXInputKeys();
-    return ((gamepadKeys != 0) ? gamepadKeys : keys) | scripted;
+    if (gamepadKeys != 0)
+        mapped = gamepadKeys;
 #endif
-
-    return keys | scripted;
+    return mapped | scripted;
 }
 
 void VDraw(SDL_Texture *texture)
@@ -880,6 +984,7 @@ void VDraw(SDL_Texture *texture)
 
     memset(sFrameImage, 0, sizeof(sFrameImage));
     DrawFrame(image);
+    Frontend_DrawMessage(image);
     SDL_UpdateTexture(texture, NULL, image, DISPLAY_WIDTH * sizeof (Uint16));
     REG_VCOUNT = 161; // prep for being in VBlank period
 }
@@ -987,6 +1092,8 @@ void Platform_SetAlarm(u8 *alarmData)
 
 void SoftReset(u32 resetFlags)
 {
+    if (sResetJumpValid && Savestate_Supported())
+        longjmp(sResetJump, 1);
     puts("Soft Reset called. Exiting.");
     exit(0);
 }
