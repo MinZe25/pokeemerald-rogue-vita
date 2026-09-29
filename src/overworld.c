@@ -553,6 +553,12 @@ void LoadSaveblockObjEventScripts(void)
 
     for (i = 0; i < OBJECT_EVENT_TEMPLATES_COUNT; i++)
     {
+#ifdef PORTABLE
+        // maps without object events (Rogue adventure maps): the GBA read
+        // garbage at address 0 and matched nothing, here it crashes on load
+        if (mapHeaderObjTemplates == NULL)
+            break;
+#endif
         for(j = 0; j < OBJECT_EVENT_TEMPLATES_COUNT; j++)
         {
             // Should be faster to just use the same index 95% of the time
