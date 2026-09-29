@@ -267,6 +267,10 @@ void CopyWindowToVram(u8 windowId, u8 mode)
 {
     struct Window windowLocal = gWindows[windowId];
     u16 windowSize = 32 * (windowLocal.window.width * windowLocal.window.height);
+#ifdef PORTABLE
+    if (windowId >= WINDOWS_MAX || gWindows[windowId].tileData == NULL) // removed window: GBA wrote near address 0
+        return;
+#endif
 
     switch (mode)
     {
@@ -288,6 +292,10 @@ void CopyWindowRectToVram(u32 windowId, u32 mode, u32 x, u32 y, u32 w, u32 h)
     struct Window windowLocal;
     int rectSize;
     int rectPos;
+#ifdef PORTABLE
+    if (windowId >= WINDOWS_MAX || gWindows[windowId].tileData == NULL) // removed window: GBA wrote near address 0
+        return;
+#endif
 
     if (w != 0 && h != 0)
     {
@@ -399,6 +407,10 @@ void BlitBitmapRectToWindow(u8 windowId, const u8 *pixels, u16 srcX, u16 srcY, u
 {
     struct Bitmap sourceRect;
     struct Bitmap destRect;
+#ifdef PORTABLE
+    if (windowId >= WINDOWS_MAX || gWindows[windowId].tileData == NULL) // removed window: GBA wrote near address 0
+        return;
+#endif
 
     sourceRect.pixels = (u8 *)pixels;
     sourceRect.width = srcWidth;
@@ -430,6 +442,10 @@ static void UNUSED BlitBitmapRectToWindowWithColorKey(u8 windowId, const u8 *pix
 void FillWindowPixelRect(u8 windowId, u8 fillValue, u16 x, u16 y, u16 width, u16 height)
 {
     struct Bitmap pixelRect;
+#ifdef PORTABLE
+    if (windowId >= WINDOWS_MAX || gWindows[windowId].tileData == NULL) // removed window: GBA wrote near address 0
+        return;
+#endif
 
     pixelRect.pixels = gWindows[windowId].tileData;
     pixelRect.width = 8 * gWindows[windowId].window.width;
@@ -440,6 +456,10 @@ void FillWindowPixelRect(u8 windowId, u8 fillValue, u16 x, u16 y, u16 width, u16
 
 void CopyToWindowPixelBuffer(u8 windowId, const void *src, u16 size, u16 tileOffset)
 {
+#ifdef PORTABLE
+    if (windowId >= WINDOWS_MAX || gWindows[windowId].tileData == NULL) // removed window: GBA wrote near address 0
+        return;
+#endif
     if (size != 0)
         CpuCopy16(src, gWindows[windowId].tileData + (32 * tileOffset), size);
     else
@@ -450,6 +470,10 @@ void CopyToWindowPixelBuffer(u8 windowId, const void *src, u16 size, u16 tileOff
 void FillWindowPixelBuffer(u8 windowId, u8 fillValue)
 {
     int fillSize = gWindows[windowId].window.width * gWindows[windowId].window.height;
+#ifdef PORTABLE
+    if (windowId >= WINDOWS_MAX || gWindows[windowId].tileData == NULL) // removed window: GBA wrote near address 0
+        return;
+#endif
     CpuFastFill8(fillValue, gWindows[windowId].tileData, 32 * fillSize);
 }
 
@@ -485,6 +509,10 @@ void ScrollWindow(u8 windowId, u8 direction, u8 distance, u8 fillValue)
     s32 i;
     s32 srcOffset, destOffset;
     u32 distanceLoop;
+#ifdef PORTABLE
+    if (windowId >= WINDOWS_MAX || gWindows[windowId].tileData == NULL) // removed window: GBA wrote near address 0
+        return;
+#endif
 
     switch (direction)
     {
@@ -648,6 +676,10 @@ void FillWindowPixelBuffer8Bit(u8 windowId, u8 fillValue)
 {
     s32 i;
     s32 size;
+#ifdef PORTABLE
+    if (windowId >= WINDOWS_MAX || gWindows[windowId].tileData == NULL) // removed window: GBA wrote near address 0
+        return;
+#endif
 
     size = (u16)(64 * (gWindows[windowId].window.width * gWindows[windowId].window.height));
     for (i = 0; i < size; i++)
@@ -657,6 +689,10 @@ void FillWindowPixelBuffer8Bit(u8 windowId, u8 fillValue)
 void FillWindowPixelRect8Bit(u8 windowId, u8 fillValue, u16 x, u16 y, u16 width, u16 height)
 {
     struct Bitmap pixelRect;
+#ifdef PORTABLE
+    if (windowId >= WINDOWS_MAX || gWindows[windowId].tileData == NULL) // removed window: GBA wrote near address 0
+        return;
+#endif
 
     pixelRect.pixels = gWindows[windowId].tileData;
     pixelRect.width = 8 * gWindows[windowId].window.width;
@@ -669,6 +705,10 @@ void BlitBitmapRectToWindow4BitTo8Bit(u8 windowId, const u8 *pixels, u16 srcX, u
 {
     struct Bitmap sourceRect;
     struct Bitmap destRect;
+#ifdef PORTABLE
+    if (windowId >= WINDOWS_MAX || gWindows[windowId].tileData == NULL) // removed window: GBA wrote near address 0
+        return;
+#endif
 
     sourceRect.pixels = (u8 *) pixels;
     sourceRect.width = srcWidth;
@@ -683,6 +723,10 @@ void BlitBitmapRectToWindow4BitTo8Bit(u8 windowId, const u8 *pixels, u16 srcX, u
 
 void CopyWindowToVram8Bit(u8 windowId, u8 mode)
 {
+#ifdef PORTABLE
+    if (windowId >= WINDOWS_MAX || gWindows[windowId].tileData == NULL) // removed window: GBA wrote near address 0
+        return;
+#endif
     sWindowPtr = &gWindows[windowId];
     sWindowSize = 64 * (sWindowPtr->window.width * sWindowPtr->window.height);
 

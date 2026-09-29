@@ -428,6 +428,13 @@ s32 ListMenu_ProcessInput(u8 listTaskId)
 {
     struct ListMenu *list = (void *) gTasks[listTaskId].data;
 
+#ifdef PORTABLE
+    // a stale list task id (e.g. the bag while it rebuilds its list after a
+    // sort / pocket switch) has no items: GBA reads garbage at 0, here it crashes
+    if (list->template.items == NULL)
+        return LIST_NOTHING_CHOSEN;
+#endif
+
     if (JOY_NEW(A_BUTTON))
     {
         return list->template.items[list->scrollOffset + list->selectedRow].id;
