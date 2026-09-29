@@ -147,6 +147,50 @@ static unsigned long sFollowFrame = 0;
 static unsigned long sSaveStateFrame, sLoadStateFrame, sResetFrame, sMenuFrameAt;
 static const char *sDumpList = NULL;
 static const char *sInputScript = NULL;
+// ROGUE_MONKEY=<seed>:<from frame>: random button presses; ROGUE_BATTLEFUZZ=<seed>
+static unsigned long sMonkeySeed, sMonkeyFrom, sBattleFuzz;
+extern void Harness_BattleFuzzFrame(unsigned long seed);
+extern void NullTrap_Init(void);
+
+unsigned long NullTrap_CurrentFrame(void)
+{
+    return sFrameCount;
+}
+
+static u16 MonkeyKeys(void)
+{
+    static u32 sRng;
+    static u16 sKeys;
+    static int sHold, sGap;
+
+    if (sRng == 0)
+        sRng = (u32)sMonkeySeed * 2654435761u | 1;
+    if (sHold > 0)
+    {
+        sHold--;
+        return sKeys;
+    }
+    if (sGap > 0)
+    {
+        sGap--;
+        return 0;
+    }
+    sRng = sRng * 1103515245 + 12345;
+    {
+        u32 r = (sRng >> 8) % 100;
+        static const u16 sDirs[] = { DPAD_UP, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT };
+
+        if (r < 40)      { sKeys = A_BUTTON; sHold = 3; }
+        else if (r < 52) { sKeys = B_BUTTON; sHold = 3; }
+        else if (r < 85) { sKeys = sDirs[(sRng >> 20) & 3]; sHold = 4 + (sRng >> 24) % 30; }
+        else if (r < 90) { sKeys = START_BUTTON; sHold = 3; }
+        else if (r < 92) { sKeys = SELECT_BUTTON; sHold = 3; }
+        else if (r < 96) { sKeys = (sRng & 0x10000) ? L_BUTTON : R_BUTTON; sHold = 3; }
+        else             { sKeys = 0; sHold = 20; }
+        sGap = 2 + (sRng >> 12) % 6;
+    }
+    return sKeys;
+}
 static uint16_t sFrameImage[DISPLAY_WIDTH * DISPLAY_HEIGHT];
 
 static u16 ParseKeyName(const char *name, int len)
@@ -313,6 +357,16 @@ static void InitTestHarness(void)
 {
     const char *v;
 
+    NullTrap_Init();
+    if ((v = getenv("ROGUE_MONKEY")) != NULL)
+    {
+        char *end;
+        sMonkeySeed = strtoul(v, &end, 10);
+        sMonkeyFrom = (*end == ':') ? strtoul(end + 1, NULL, 10) : 0;
+    }
+    if ((v = getenv("ROGUE_BATTLEFUZZ")) != NULL)
+        sBattleFuzz = strtoul(v, NULL, 10);
+
     sHeadless = (v = getenv("ROGUE_HEADLESS")) != NULL && *v == '1';
     if ((v = getenv("ROGUE_MAXFRAMES")) != NULL)
         sMaxFrames = strtoul(v, NULL, 10);
@@ -359,6 +413,8 @@ static bool RunGameFrame(bool draw)
         Harness_SoundTestFrame(sFrameCount - sSoundTestFrame);
     if (sFollowFrame != 0 && sFrameCount == sFollowFrame)
         Harness_EnableFollower();
+    if (sBattleFuzz != 0 && sFrameCount >= sMonkeyFrom)
+        Harness_BattleFuzzFrame(sBattleFuzz);
     MainLoop();
     if (sPerfLog)
         t1 = NowMs();
@@ -963,6 +1019,8 @@ static void ReadPhysButtons(void)
 u16 Platform_GetKeyInput(void)
 {
     u16 scripted = (sInputScript != NULL) ? GetScriptedKeys(sFrameCount) : 0;
+    if (sMonkeySeed != 0 && sFrameCount >= sMonkeyFrom)
+        scripted |= MonkeyKeys();
     u16 mapped = 0;
 
     if (!Frontend_MenuIsOpen())

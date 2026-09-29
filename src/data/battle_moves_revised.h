@@ -2,7 +2,7 @@
 
 #define ROGUE_DRAYANO // temp
 
-const struct BattleMove gBattleMoves_Revised[MOVES_COUNT_DYNAMAX] =
+const struct BattleMove gBattleMoves_Revised[BATTLE_MOVES_TABLE_SIZE] =
 {
     [MOVE_NONE] =
     {

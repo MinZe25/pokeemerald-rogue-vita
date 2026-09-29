@@ -1818,7 +1818,14 @@ static void Cmd_accuracycheck(void)
     CMD_ARGS(const u8 *failInstr, u16 move);
 
     u32 type, move = cmd->move;
+#ifdef PORTABLE
+    // cmd->move can be NO_ACC_CALC_CHECK_LOCK_ON (0xFFFF): out of bounds of
+    // gBattleMoves (harmless ROM read on GBA, crash here)
+    u32 moveTarget = GetBattlerMoveTargetType(gBattlerAttacker,
+        (move == ACC_CURR_MOVE || move == NO_ACC_CALC_CHECK_LOCK_ON) ? gCurrentMove : move);
+#else
     u32 moveTarget = GetBattlerMoveTargetType(gBattlerAttacker, move);
+#endif
     u32 abilityAtk = GetBattlerAbility(gBattlerAttacker);
     u32 abilityDef = GetBattlerAbility(gBattlerTarget);
     u32 holdEffectAtk = GetBattlerHoldEffect(gBattlerAttacker, TRUE);
@@ -11868,7 +11875,12 @@ static void Cmd_statbuffchange(void)
     if (ChangeStatBuffs(GET_STAT_BUFF_VALUE_WITH_SIGN(gBattleScripting.statChanger), GET_STAT_BUFF_ID(gBattleScripting.statChanger), flags, failInstr) == STAT_CHANGE_WORKED)
         gBattlescriptCurrInstr = cmd->nextInstr;
     else if (gBattlescriptCurrInstr == ptrBefore) // Prevent infinite looping.
+#ifdef PORTABLE
+        // some scripts pass a NULL failInstr: carry on instead of jumping to 0
+        gBattlescriptCurrInstr = failInstr != NULL ? failInstr : cmd->nextInstr;
+#else
         gBattlescriptCurrInstr = failInstr;
+#endif
 }
 
 bool32 TryResetBattlerStatChanges(u8 battler)

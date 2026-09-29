@@ -1360,6 +1360,12 @@ void ItemUseOutOfBattle_EscapeRope(u8 taskId)
 
 void ItemUseOutOfBattle_EvolutionStone(u8 taskId)
 {
+    if (gTasks[taskId].tUsingRegisteredKeyItem)
+    {
+        // registered scrolls: the party menu callback needs the bag menu open
+        DisplayDadsAdviceCannotUseItemMessage(taskId, gTasks[taskId].tUsingRegisteredKeyItem);
+        return;
+    }
     gItemUseCB = ItemUseCB_EvolutionStone;
     SetUpItemUseCallback(taskId);
 }
@@ -1678,6 +1684,12 @@ void ItemUseOutOfBattle_Meteorite(u8 taskId)
 
 void ItemUseOutOfBattle_Fusion(u8 taskId)
 {
+    if (gTasks[taskId].tUsingRegisteredKeyItem)
+    {
+        // same as the other form change key items: needs the bag menu open
+        DisplayDadsAdviceCannotUseItemMessage(taskId, gTasks[taskId].tUsingRegisteredKeyItem);
+        return;
+    }
     gItemUseCB = ItemUseCB_Fusion;
     gTasks[taskId].data[0] = FALSE;
     SetUpItemUseCallback(taskId);

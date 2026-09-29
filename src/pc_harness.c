@@ -41,6 +41,86 @@ void Harness_StartTestBattle(void)
 #endif
 
 #ifdef PORTABLE
+#include "script.h"
+
+static u32 sFuzzRng;
+
+static u32 FuzzRand(u32 n)
+{
+    sFuzzRng = sFuzzRng * 1103515245 + 12345;
+    return ((sFuzzRng >> 8) & 0xFFFFFF) % n;
+}
+
+static u16 FuzzSpecies(void)
+{
+    for (;;)
+    {
+        u16 species = 1 + FuzzRand(NUM_SPECIES - 1);
+        if (gSpeciesInfo[species].baseHP != 0)
+            return species;
+    }
+}
+
+static void FuzzMon(struct Pokemon *mon)
+{
+    u8 abilityNum = FuzzRand(3);
+    u16 item = FuzzRand(4) == 0 ? ITEM_NONE : 1 + FuzzRand(ITEMS_COUNT - 1);
+
+    CreateMon(mon, FuzzSpecies(), 20 + FuzzRand(81), USE_RANDOM_IVS, FALSE, 0, OT_ID_PLAYER_ID, 0);
+    SetMonData(mon, MON_DATA_ABILITY_NUM, &abilityNum);
+    SetMonData(mon, MON_DATA_HELD_ITEM, &item);
+}
+
+// ROGUE_BATTLEFUZZ=<seed>: back-to-back wild battles (singles and doubles) with
+// random parties, abilities and held items; the input monkey plays them
+void Harness_BattleFuzzFrame(unsigned long seed)
+{
+    static unsigned long sIdleFrames;
+    int i, count;
+
+    if (sFuzzRng == 0)
+        sFuzzRng = seed | 1;
+    if (gMain.callback2 != CB2_Overworld || ArePlayerFieldControlsLocked() || ScriptContext_IsEnabled())
+    {
+        sIdleFrames = 0;
+        return;
+    }
+    if (++sIdleFrames < 90)
+        return;
+    sIdleFrames = 0;
+
+    count = 1 + FuzzRand(PARTY_SIZE);
+    ZeroPlayerPartyMons();
+    for (i = 0; i < count; i++)
+        FuzzMon(&gPlayerParty[i]);
+    CalculatePlayerPartyCount();
+
+    if (FuzzRand(3) == 0 && count >= 2)
+    {
+        CreateScriptedDoubleWildMon(FuzzSpecies(), 20 + FuzzRand(81), ITEM_NONE, FALSE,
+                                    FuzzSpecies(), 20 + FuzzRand(81), ITEM_NONE, FALSE);
+        for (i = 0; i < 2; i++)
+        {
+            u8 abilityNum = FuzzRand(3);
+            u16 item = 1 + FuzzRand(ITEMS_COUNT - 1);
+            SetMonData(&gEnemyParty[i], MON_DATA_ABILITY_NUM, &abilityNum);
+            SetMonData(&gEnemyParty[i], MON_DATA_HELD_ITEM, &item);
+        }
+        BattleSetup_StartScriptedDoubleWildBattle();
+    }
+    else
+    {
+        u8 abilityNum = FuzzRand(3);
+        u16 item = 1 + FuzzRand(ITEMS_COUNT - 1);
+        CreateScriptedWildMon(FuzzSpecies(), 20 + FuzzRand(81), ITEM_NONE, FALSE);
+        SetMonData(&gEnemyParty[0], MON_DATA_ABILITY_NUM, &abilityNum);
+        SetMonData(&gEnemyParty[0], MON_DATA_HELD_ITEM, &item);
+        BattleSetup_StartScriptedWildBattle();
+    }
+}
+#endif
+
+#ifdef PORTABLE
 #include "event_data.h"
 #include "constants/flags.h"
 void FollowMon_ClearCachedPartnerSpecies(void);

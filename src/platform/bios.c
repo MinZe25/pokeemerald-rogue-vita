@@ -3,8 +3,14 @@
 
 // BIOS function implementations are based on the VBA-M source code.
 
+// Sources in the GBA BIOS area (0-0x3FFF) are almost always NULL pointers the
+// GBA copies garbage from; read zeros instead of crashing
+#define IS_BIOS_AREA(p) ((uintptr_t)(p) < 0x4000)
+
 static uint32_t CPUReadMemory(const void *src)
 {
+    if (IS_BIOS_AREA(src))
+        return 0;
     return *(uint32_t *)src;
 }
 
@@ -15,6 +21,8 @@ static void CPUWriteMemory(void *dest, uint32_t val)
 
 static uint16_t CPUReadHalfWord(const void *src)
 {
+    if (IS_BIOS_AREA(src))
+        return 0;
     return *(uint16_t *)src;
 }
 
@@ -25,6 +33,8 @@ static void CPUWriteHalfWord(void *dest, uint16_t val)
 
 static uint8_t CPUReadByte(const void *src)
 {
+    if (IS_BIOS_AREA(src))
+        return 0;
     return *(uint8_t *)src;
 }
 

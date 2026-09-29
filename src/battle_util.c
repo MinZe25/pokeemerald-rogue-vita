@@ -10053,6 +10053,11 @@ static inline u32 CalcDefenseStat(u32 move, u32 battlerAtk, u32 battlerDef, u32 
 // base damage formula before adding any modifiers
 static inline s32 CalculateBaseDamage(u32 power, u32 userFinalAttack, u32 level, u32 targetFinalDefense)
 {
+#ifdef PORTABLE
+    // defense can round down to 0: ARM (GBA/Vita) division by 0 yields 0, x86 traps
+    if (targetFinalDefense == 0)
+        return 2;
+#endif
     return power * userFinalAttack * (2 * level / 5 + 2) / targetFinalDefense / 50 + 2;
 }
 

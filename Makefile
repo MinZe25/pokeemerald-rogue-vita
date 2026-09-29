@@ -675,7 +675,7 @@ endif
 # renamed so the platform layer can snapshot all game state (save states,
 # resets). The platform side (SDL, menu) stays outside. Needs ELF (__start_/
 # __stop_ symbols), so Windows links as before.
-PLATFORM_SIDE_OBJS := src/platform/sdl2.o src/platform/frontend.o src/platform/savestate.o
+PLATFORM_SIDE_OBJS := src/platform/sdl2.o src/platform/frontend.o src/platform/savestate.o src/platform/nulltrap.o
 GAME_SIDE_OBJS = $(filter-out $(PLATFORM_SIDE_OBJS),$(OBJS_REL))
 ifeq ($(TARGET_OS),WINDOWS)
 LINK_OBJS = $(OBJS_REL)

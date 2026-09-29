@@ -537,6 +537,14 @@ extern u8 gEnemyPartyCount;
 extern struct Pokemon gEnemyParty[PARTY_SIZE];
 extern struct SpriteTemplate gMultiuseSpriteTemplate;
 
+#ifdef PORTABLE
+// Some code indexes the move table with MOVE_UNAVAILABLE (0xFFFF), e.g.
+// gChosenMoveByBattler of a battler that has not chosen a move: a harmless
+// ROM read on GBA, a crash here. Pad so any u16 move id reads a zeroed move.
+#define BATTLE_MOVES_TABLE_SIZE 0x10000
+#else
+#define BATTLE_MOVES_TABLE_SIZE MOVES_COUNT_DYNAMAX
+#endif
 extern const struct BattleMove gBattleMoves_Mainline[];
 extern const struct BattleMove gBattleMoves_Revised[];
 extern const u8 gFacilityClassToPicIndex[];
