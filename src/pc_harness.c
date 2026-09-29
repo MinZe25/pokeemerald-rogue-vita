@@ -121,6 +121,54 @@ void Harness_BattleFuzzFrame(unsigned long seed)
 #endif
 
 #ifdef PORTABLE
+#include <stdio.h>
+#include "event_object_movement.h"
+#include "field_player_avatar.h"
+#include "berry.h"
+#include "rogue_controller.h"
+
+extern const u8 BerryTreeScript[];
+bool8 Rogue_IsRunActive(void);
+
+// ROGUE_STATEDUMP=<frame>: prints run state and the map's object events
+void Harness_DumpState(void)
+{
+    int i;
+    s16 x, y;
+
+    PlayerGetDestCoords(&x, &y);
+    printf("STATE run=%d map=%d.%d player=(%d,%d) elev=%d facing=%d BerryTreeScript=%p\n",
+           Rogue_IsRunActive(), gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum,
+           x, y, gObjectEvents[gPlayerAvatar.objectEventId].currentElevation, GetPlayerFacingDirection(), (const void *)BerryTreeScript);
+    for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
+    {
+        struct ObjectEvent *obj = &gObjectEvents[i];
+        if (!obj->active)
+            continue;
+        printf("  obj %2d local=%3d gfx=%4d at (%d,%d) script=%p trainerType=%d\n", i, obj->localId, obj->graphicsId,
+               obj->currentCoords.x, obj->currentCoords.y,
+               (const void *)GetObjectEventScriptPointerByObjectEventId(i), obj->trainerType);
+        if (GetObjectEventScriptPointerByObjectEventId(i) == BerryTreeScript)
+        {
+            u8 id = GetObjectEventBerryTreeId(i);
+            struct BerryTree *tree = GetBerryTreeInfo(id);
+            printf("       berryTreeId=%d berry=%d stage=%d stopGrowth=%d minutes=%d yield=%d invisible=%d elev=%d/%d spriteInvisible=%d\n",
+                   id, tree->berry, tree->stage, tree->stopGrowth, tree->minutesUntilNextStage, tree->berryYield,
+                   obj->invisible, obj->currentElevation, obj->previousElevation, gSprites[obj->spriteId].invisible);
+        }
+    }
+    for (i = 0; i < gSaveBlock1Ptr->objectEventTemplatesCount; i++)
+    {
+        const struct ObjectEventTemplate *t = &gSaveBlock1Ptr->objectEventTemplates[i];
+        if (t->script == BerryTreeScript || (t->x >= x - 3 && t->x <= x + 3 && t->y >= y - 3 && t->y <= y + 3))
+            printf("  tmpl %2d local=%3d at (%d,%d) script=%p%s\n", i, t->localId, t->x + 7, t->y + 7,
+                   (const void *)t->script, t->script == BerryTreeScript ? " (BerryTreeScript)" : "");
+    }
+    fflush(stdout);
+}
+#endif
+
+#ifdef PORTABLE
 #include "event_data.h"
 #include "constants/flags.h"
 void FollowMon_ClearCachedPartnerSpecies(void);

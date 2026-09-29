@@ -384,7 +384,8 @@ static const u8 *GetInteractedObjectEventScript(struct MapPosition *position, u8
     }
 
     // Cannot interact with invisible object events
-    if(gObjectEvents[objectEventId].invisible)
+    // (except berry trees: empty soil is an invisible object, planting needs it)
+    if(gObjectEvents[objectEventId].invisible && gObjectEvents[objectEventId].movementType != MOVEMENT_TYPE_BERRY_TREE_GROWTH)
         return NULL;
 
     gSelectedObjectEvent = objectEventId;

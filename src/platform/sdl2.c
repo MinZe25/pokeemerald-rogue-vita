@@ -148,7 +148,8 @@ static unsigned long sSaveStateFrame, sLoadStateFrame, sResetFrame, sMenuFrameAt
 static const char *sDumpList = NULL;
 static const char *sInputScript = NULL;
 // ROGUE_MONKEY=<seed>:<from frame>: random button presses; ROGUE_BATTLEFUZZ=<seed>
-static unsigned long sMonkeySeed, sMonkeyFrom, sBattleFuzz;
+static unsigned long sMonkeySeed, sMonkeyFrom, sBattleFuzz, sStateDumpFrame;
+extern void Harness_DumpState(void);
 extern void Harness_BattleFuzzFrame(unsigned long seed);
 extern void NullTrap_Init(void);
 
@@ -366,6 +367,8 @@ static void InitTestHarness(void)
     }
     if ((v = getenv("ROGUE_BATTLEFUZZ")) != NULL)
         sBattleFuzz = strtoul(v, NULL, 10);
+    if ((v = getenv("ROGUE_STATEDUMP")) != NULL)
+        sStateDumpFrame = strtoul(v, NULL, 10);
 
     sHeadless = (v = getenv("ROGUE_HEADLESS")) != NULL && *v == '1';
     if ((v = getenv("ROGUE_MAXFRAMES")) != NULL)
@@ -415,6 +418,8 @@ static bool RunGameFrame(bool draw)
         Harness_EnableFollower();
     if (sBattleFuzz != 0 && sFrameCount >= sMonkeyFrom)
         Harness_BattleFuzzFrame(sBattleFuzz);
+    if (sStateDumpFrame != 0 && sFrameCount == sStateDumpFrame)
+        Harness_DumpState();
     MainLoop();
     if (sPerfLog)
         t1 = NowMs();
