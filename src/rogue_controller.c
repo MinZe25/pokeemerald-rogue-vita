@@ -3393,6 +3393,15 @@ void Rogue_NotifySaveVersionUpdated(u16 fromVersion, u16 toVersion)
     else
         gRogueLocal.hasVersionUpdateMsgPending = TRUE;
 
+#ifdef PORTABLE
+    // Map objects saved by an older version can reference graphics/animations that have
+    // since been renumbered (a harmless glitch on GBA, a crash on PC/Vita), so rebuild
+    // the current map from its templates instead of restoring them.
+    extern void SetContinueGameWarp(s8 mapGroup, s8 mapNum, s8 warpId, s8 x, s8 y);
+    SetContinueGameWarp(gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum, WARP_ID_NONE, gSaveBlock1Ptr->pos.x, gSaveBlock1Ptr->pos.y);
+    SetContinueGameWarpStatus();
+#endif
+
     // Clear saved adventures
     for(i = 0; i < ARRAY_COUNT(gRogueSaveBlock->adventureReplay); ++i)
         gRogueSaveBlock->adventureReplay[i].isValid = FALSE;

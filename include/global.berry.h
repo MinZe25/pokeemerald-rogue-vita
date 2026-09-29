@@ -20,7 +20,7 @@ struct Berry
     u8 bitter;
     u8 sour;
     u8 smoothness;
-};
+} GBA_STRUCT_LAYOUT;
 
 // with no const fields
 
@@ -41,7 +41,7 @@ struct Berry2
     u8 sour;
     u8 smoothness;
     //u8 padding;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct EnigmaBerry
 {
@@ -50,7 +50,7 @@ struct EnigmaBerry
     u8 holdEffect;
     u8 holdEffectParam;
     u32 checksum;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct BattleEnigmaBerry
 {
@@ -58,7 +58,7 @@ struct BattleEnigmaBerry
     /*0x07*/ u8 holdEffect;
     /*0x08*/ u8 itemEffect[BERRY_ITEM_EFFECT_COUNT];
     /*0x1A*/ u8 holdEffectParam;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct BerryTree
 {
@@ -72,6 +72,6 @@ struct BerryTree
     u8 watered2:1;
     u8 watered3:1;
     u8 watered4:1;
-};
+} GBA_STRUCT_LAYOUT;
 
 #endif // GUARD_GLOBAL_BERRY_H

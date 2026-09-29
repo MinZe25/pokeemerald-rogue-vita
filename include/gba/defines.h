@@ -22,6 +22,16 @@
 #endif
 
 #define ALIGNED(n) __attribute__((aligned(n)))
+
+// The GBA build uses -mabi=apcs-gnu, which gives every struct at least 4 byte
+// alignment and rounds its size up to a multiple of 4. Structs stored in save
+// data must keep that layout on PC/Vita, otherwise saves are not compatible
+// with the GBA version (and with GBA emulator saves).
+#ifdef PORTABLE
+#define GBA_STRUCT_LAYOUT __attribute__((aligned(4)))
+#else
+#define GBA_STRUCT_LAYOUT
+#endif
 #define PACKED __attribute__((packed))
 
 #define BG_PLTT_SIZE  0x200

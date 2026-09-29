@@ -44,7 +44,7 @@ struct Tileset
     /*0x0C*/ const u16 *metatiles;
     /*0x10*/ const u16 *metatileAttributes;
     /*0x14*/ TilesetCB callback;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct MapLayout
 {
@@ -54,14 +54,14 @@ struct MapLayout
     /*0x0C*/ const u16 *map;
     /*0x10*/ const struct Tileset *primaryTileset;
     /*0x14*/ const struct Tileset *secondaryTileset;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct BackupMapLayout
 {
     s32 width;
     s32 height;
     u16 *map;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct ObjectEventTemplate
 {
@@ -78,7 +78,7 @@ struct ObjectEventTemplate
     /*0x0E*/ u16 trainerRange_berryTreeId;
     /*0x10*/ const u8 *script;
     /*0x14*/ u16 flagId;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct WarpEvent
 {
@@ -87,7 +87,7 @@ struct WarpEvent
     u8 warpId;
     u8 mapNum;
     u8 mapGroup;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct CoordEvent
 {
@@ -96,7 +96,7 @@ struct CoordEvent
     u16 trigger;
     u16 index;
     const u8 *script;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct BgEvent
 {
@@ -111,7 +111,7 @@ struct BgEvent
         } hiddenItem;
         u32 secretBaseId;
     } bgUnion;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct MapEvents
 {
@@ -123,7 +123,7 @@ struct MapEvents
     const struct WarpEvent *warps;
     const struct CoordEvent *coordEvents;
     const struct BgEvent *bgEvents;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct MapConnection
 {
@@ -131,13 +131,13 @@ struct MapConnection
     u32 offset;
     u8 mapGroup;
     u8 mapNum;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct MapConnections
 {
     s32 count;
     const struct MapConnection *connections;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct MapHeader
 {
@@ -159,7 +159,7 @@ struct MapHeader
                bool8 showMapName:5; // the last 4 bits are unused
                                     // but the 5 bit sized bitfield is required to match
     /* 0x1B */ u8 battleType;
-};
+} GBA_STRUCT_LAYOUT;
 
 
 struct ObjectEvent
@@ -219,7 +219,7 @@ struct ObjectEvent
     /*0x22*/ u8 playerCopyableMovement; // COPY_MOVE_*
     /*0x23*/ u8 spriteId;
     /*size = 0x24*/
-};
+} GBA_STRUCT_LAYOUT;
 
 struct ObjectEventGraphicsInfo
 {
@@ -239,7 +239,7 @@ struct ObjectEventGraphicsInfo
     /*0x18*/ const union AnimCmd *const *anims;
     /*0x1C*/ const struct SpriteFrameImage *images;
     /*0x20*/ const union AffineAnimCmd *const *affineAnims;
-};
+} GBA_STRUCT_LAYOUT;
 
 enum {
     PLAYER_AVATAR_STATE_NORMAL,
@@ -340,14 +340,14 @@ struct PlayerAvatar
     /*0x14*/ u8 dirTimerHistory[8];
     /*0x1C*/ u8 abStartSelectTimerHistory[8];
     u16 lastSpinTile;
-};
+} GBA_STRUCT_LAYOUT;
 
 struct Camera
 {
     bool8 active:1;
     s32 x;
     s32 y;
-};
+} GBA_STRUCT_LAYOUT;
 
 extern struct ObjectEvent gObjectEvents[OBJECT_EVENTS_COUNT];
 extern u8 gSelectedObjectEvent;
