@@ -51,3 +51,10 @@ pokeemerald-*.png/pokeemerald_rogue
 /SDL2/
 *.sav
 data/specials_local.inc
+
+# PC / Vita port build outputs and test harness dumps
+/pokeemerald_rogue
+/pokeemerald_rogue.exe
+/pokeemerald_rogue.vpk
+/frame_*.bmp
+/game_combined.o
