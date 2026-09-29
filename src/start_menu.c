@@ -404,6 +404,12 @@ static void BuildNormalStartMenu(void)
     //AddStartMenuAction(MENU_ACTION_EXIT);
 }
 
+#ifdef PORTABLE
+extern int Platform_SaveAnywhere(void); // frontend option (src/platform/frontend.c)
+#else
+#define Platform_SaveAnywhere() FALSE
+#endif
+
 static void BuildRogueRunStartMenu(void)
 {
     bool8 inCatchingContest = Rogue_IsCatchingContestActive();
@@ -435,9 +441,9 @@ static void BuildRogueRunStartMenu(void)
 
     AddStartMenuAction(MENU_ACTION_PLAYER);
 
-    if (!inCatchingContest && FlagGet(FLAG_SYS_SAVE_DISABLED) == FALSE)
+    if (!inCatchingContest && (FlagGet(FLAG_SYS_SAVE_DISABLED) == FALSE || Platform_SaveAnywhere()))
     {
-        if(IsCharmActive(EFFECT_ALLOW_SAVE_SCUM))
+        if(IsCharmActive(EFFECT_ALLOW_SAVE_SCUM) || Platform_SaveAnywhere())
         {
             AddStartMenuAction(MENU_ACTION_SAVE);
         }

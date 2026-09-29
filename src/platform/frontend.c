@@ -108,6 +108,8 @@ void Frontend_Init(const char *dataDir)
             gFrontendConfig.saveFile = value;
         else if (!strcmp(key, "touch_menu"))
             gFrontendConfig.touchOpensMenu = value != 0;
+        else if (!strcmp(key, "save_anywhere"))
+            gFrontendConfig.saveAnywhere = value != 0;
         else
         {
             for (int i = 0; i < ACTION_COUNT; i++)
@@ -128,9 +130,9 @@ void Frontend_SaveConfig(void)
 
     if (f == NULL)
         return;
-    fprintf(f, "scale=%d\nsmooth=%d\nff_speed=%d\nsave_file=%d\ntouch_menu=%d\n", gFrontendConfig.scale,
+    fprintf(f, "scale=%d\nsmooth=%d\nff_speed=%d\nsave_file=%d\ntouch_menu=%d\nsave_anywhere=%d\n", gFrontendConfig.scale,
             gFrontendConfig.smoothFilter, gFrontendConfig.fastForwardSpeed, gFrontendConfig.saveFile,
-            gFrontendConfig.touchOpensMenu);
+            gFrontendConfig.touchOpensMenu, gFrontendConfig.saveAnywhere);
     for (int i = 0; i < ACTION_COUNT; i++)
     {
         int bit = 0;
@@ -158,6 +160,12 @@ uint16_t Frontend_MapButtons(uint32_t phys)
 bool Frontend_FastForwardHeld(uint32_t phys)
 {
     return (phys & gFrontendConfig.actionButton[ACTION_FAST_FORWARD]) != 0;
+}
+
+// Called by the game's start menu (src/start_menu.c)
+int Platform_SaveAnywhere(void)
+{
+    return gFrontendConfig.saveAnywhere;
 }
 
 bool Frontend_MenuButtonPressed(uint32_t phys)
@@ -223,6 +231,7 @@ enum
     ITEM_SCALE,
     ITEM_FILTER,
     ITEM_FF_SPEED,
+    ITEM_SAVE_ANYWHERE,
     ITEM_REMAP,
     ITEM_SAVE_FILE,
     ITEM_RESET,
@@ -348,6 +357,9 @@ int Frontend_UpdateMenu(uint32_t phys)
         case ITEM_FF_SPEED:
             gFrontendConfig.fastForwardSpeed = WrapAdd(gFrontendConfig.fastForwardSpeed - 2, delta, 4) + 2;
             break;
+        case ITEM_SAVE_ANYWHERE:
+            gFrontendConfig.saveAnywhere = !gFrontendConfig.saveAnywhere;
+            break;
         case ITEM_SAVE_FILE:
             sPendingSaveFile = WrapAdd(sPendingSaveFile - 1, delta, SAVE_FILES) + 1;
             break;
@@ -383,6 +395,9 @@ int Frontend_UpdateMenu(uint32_t phys)
             break;
         case ITEM_FF_SPEED:
             gFrontendConfig.fastForwardSpeed = WrapAdd(gFrontendConfig.fastForwardSpeed - 2, 1, 4) + 2;
+            break;
+        case ITEM_SAVE_ANYWHERE:
+            gFrontendConfig.saveAnywhere = !gFrontendConfig.saveAnywhere;
             break;
         case ITEM_REMAP:
             sMenuPage = 1;
@@ -448,7 +463,7 @@ static void FillRect(uint16_t *frame, int x, int y, int w, int h, uint16_t color
 
 static void DrawRow(uint16_t *frame, int row, bool selected, const char *label, const char *value, bool enabled)
 {
-    int y = 20 + row * 11;
+    int y = 20 + row * 10;
     uint16_t color = !enabled ? COLOR_DISABLED : (selected ? COLOR_SELECTED : COLOR_TEXT);
 
     if (selected)
@@ -479,6 +494,7 @@ void Frontend_DrawMenu(uint16_t *frame)
         DrawRow(frame, ITEM_FILTER, sCursor == ITEM_FILTER, "Filter", value, true);
         snprintf(value, sizeof(value), "< %dx >", gFrontendConfig.fastForwardSpeed);
         DrawRow(frame, ITEM_FF_SPEED, sCursor == ITEM_FF_SPEED, "Fast fwd", value, true);
+        DrawRow(frame, ITEM_SAVE_ANYWHERE, sCursor == ITEM_SAVE_ANYWHERE, "Save anywhere", gFrontendConfig.saveAnywhere ? "< On >" : "< Off >", true);
         DrawRow(frame, ITEM_REMAP, sCursor == ITEM_REMAP, "Buttons...", NULL, true);
         snprintf(value, sizeof(value), "< %d >%s", sPendingSaveFile, sPendingSaveFile != gFrontendConfig.saveFile ? " X=load" : "");
         DrawRow(frame, ITEM_SAVE_FILE, sCursor == ITEM_SAVE_FILE, "Save file", value, states);

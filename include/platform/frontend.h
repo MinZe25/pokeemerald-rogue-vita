@@ -64,6 +64,7 @@ struct FrontendConfig
     int fastForwardSpeed; // 2..5
     int saveFile;         // 1..3
     int touchOpensMenu;
+    int saveAnywhere;     // real in-game Save during runs / where saving is disabled
     uint32_t actionButton[ACTION_COUNT]; // PHYS_* bit per action
 };
 
