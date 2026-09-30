@@ -897,6 +897,12 @@ void AnimTask_TintPalettes(u8 taskId)
 #undef tColorG
 #undef tColorB
 
+// The shaken coordinate's address is split over data[6] (low half) and
+// data[7] (high half). data[] is s16: without the u16 cast a low half >= 0x8000
+// sign-extends over the high half (0xFFFFxxxx), which only works by luck of
+// the GBA memory layout and crashed on the Vita (e.g. Wing Attack)
+#define SHAKE_TARGET_PTR(sprite) ((u32)(u16)(sprite)->data[6] | ((u32)(u16)(sprite)->data[7] << 16))
+
 static void AnimShakeMonOrBattleTerrain(struct Sprite *sprite)
 {
     u16 var0;
@@ -923,7 +929,7 @@ static void AnimShakeMonOrBattleTerrain(struct Sprite *sprite)
         break;
     }
 
-    sprite->data[4] = *(u16 *)(sprite->data[6] | (sprite->data[7] << 16));
+    sprite->data[4] = *(u16 *)(SHAKE_TARGET_PTR(sprite));
     sprite->data[5] = gBattleAnimArgs[3];
     var0 = sprite->data[5] - 2;
     if (var0 < 2)
@@ -947,13 +953,13 @@ static void AnimShakeMonOrBattleTerrain_Step(struct Sprite *sprite)
         else
         {
             sprite->data[1] = sprite->data[2];
-            *(u16 *)(sprite->data[6] | (sprite->data[7] << 16)) += sprite->data[0];
+            *(u16 *)(SHAKE_TARGET_PTR(sprite)) += sprite->data[0];
             sprite->data[0] = -sprite->data[0];
         }
     }
     else
     {
-        *(u16 *)(sprite->data[6] | (sprite->data[7] << 16)) = sprite->data[4];
+        *(u16 *)(SHAKE_TARGET_PTR(sprite)) = sprite->data[4];
         var0 = sprite->data[5] - 2;
         if (var0 < 2)
         {
