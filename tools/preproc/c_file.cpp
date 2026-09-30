@@ -25,6 +25,8 @@
 #include <memory>
 #include <cstring>
 #include <cerrno>
+#include <cstdlib>
+#include <map>
 #include "preproc.h"
 #include "c_file.h"
 #include "char_util.h"
@@ -319,6 +321,39 @@ int ExtractData(const std::unique_ptr<unsigned char[]>& buffer, int offset, int 
     }
 }
 
+// PC/Vita ROM_ASSETS builds: $ROM_ASSETS_STRIP lists "<id> <path>" of asset
+// files that are not embedded. Their INCBIN becomes a same-size placeholder
+// (0x7F 'R' 'A' 'S' + little endian id + zeros), filled from the player's ROM
+// at startup (src/platform/rom_assets.c).
+static const std::map<std::string, unsigned int>& StrippedAssets()
+{
+    static std::map<std::string, unsigned int> assets;
+    static bool loaded = false;
+
+    if (!loaded)
+    {
+        const char *listPath = std::getenv("ROM_ASSETS_STRIP");
+        loaded = true;
+        if (listPath != nullptr && *listPath)
+        {
+            FILE *f = std::fopen(listPath, "r");
+            char line[1024];
+
+            if (f == nullptr)
+                FATAL_ERROR("Failed to open ROM_ASSETS_STRIP list \"%s\"\n", listPath);
+            while (std::fgets(line, sizeof(line), f))
+            {
+                unsigned int id;
+                char path[1000];
+                if (line[0] != '#' && std::sscanf(line, "%x %999s", &id, path) == 2)
+                    assets[path] = id;
+            }
+            std::fclose(f);
+        }
+    }
+    return assets;
+}
+
 void CFile::TryConvertIncbin()
 {
     std::string idents[6] = { "INCBIN_S8", "INCBIN_U8", "INCBIN_S16", "INCBIN_U16", "INCBIN_S32", "INCBIN_U32" };
@@ -396,6 +431,23 @@ void CFile::TryConvertIncbin()
 
         if ((fileSize % size) != 0)
             RaiseError("Size %d doesn't evenly divide file size %d.\n", size, fileSize);
+
+        {
+            auto stripped = StrippedAssets().find(path);
+            if (stripped != StrippedAssets().end() && fileSize >= 8)
+            {
+                unsigned int id = stripped->second;
+                std::memset(buffer.get(), 0, fileSize);
+                buffer[0] = 0x7F;
+                buffer[1] = 'R';
+                buffer[2] = 'A';
+                buffer[3] = 'S';
+                buffer[4] = id & 0xFF;
+                buffer[5] = (id >> 8) & 0xFF;
+                buffer[6] = (id >> 16) & 0xFF;
+                buffer[7] = (id >> 24) & 0xFF;
+            }
+        }
 
         int count = fileSize / size;
         int offset = 0;

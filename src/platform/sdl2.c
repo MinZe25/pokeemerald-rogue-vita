@@ -40,6 +40,7 @@ unsigned int _newlib_heap_size_user = 64 * 1024 * 1024; // SDL + save state snap
 #include "platform/framedraw.h"
 #include "platform/system.h"
 #include "platform/frontend.h"
+#include "platform/rom_assets.h"
 #include "platform/savestate.h"
 #include <setjmp.h>
 
@@ -71,6 +72,10 @@ static bool sResetJumpValid;
 static uint16_t sMenuFrame[DISPLAY_WIDTH * DISPLAY_HEIGHT];
 static void ReadPhysButtons(void);
 static void PresentFrame(void);
+static void ShowMissingRomScreen(const char *problem);
+#ifdef __vita__
+static uint32_t GetVitaPhys(void);
+#endif
 static void RestartGame(void);
 static void HandleFrontendRequest(int request);
 #ifdef __vita__
@@ -92,7 +97,7 @@ static void CloseSaveFile(void);
 static void UpdateInternalClock(void);
 
 // Log file (DATA_DIR/log.txt) - also echoed to stdout on desktop
-static void PlatformLog(const char *fmt, ...)
+void PlatformLog(const char *fmt, ...)
 {
     va_list args;
 #ifdef __vita__
@@ -588,6 +593,18 @@ int main(int argc, char **argv)
     }
 
     PlatformLog("SDL ready, starting game\n");
+    // graphics, sounds and maps come from the player's ROM (ROM_ASSETS builds)
+    {
+        char romError[64];
+        if (!RomAssets_Load(*DATA_DIR ? DATA_DIR : "./", romError, sizeof(romError)))
+        {
+            PlatformLog("ROM assets: %s\n", romError);
+            ShowMissingRomScreen(romError);
+            return 1;
+        }
+        // the ROM takes seconds to load on the Vita: start the game clock now
+        simTime = curGameTime = lastGameTime = SDL_GetPerformanceCounter();
+    }
     // Power-on state of all game memory, used for resets and switching save files
     Savestate_TakeBootSnapshot();
     AgbMain();
@@ -644,6 +661,10 @@ int main(int argc, char **argv)
 
         curGameTime = SDL_GetPerformanceCounter();
         deltaTime = (double)((curGameTime - lastGameTime) / (double)SDL_GetPerformanceFrequency());
+        // a long stall (loading the ROM, a slow memory card write) counts as one
+        // frame: catching it up would run seconds of game unseen
+        if (deltaTime > 0.25)
+            deltaTime = fixedTimestep;
         deltaTime *= timeScale; //apply speedup
 
         if (!paused)
@@ -816,6 +837,61 @@ static void CloseSaveFile()
     {
         fclose(sSaveFile);
         sSaveFile = NULL;
+    }
+}
+
+// Shown when the game data can't be loaded from the player's ROM
+static void ShowMissingRomScreen(const char *problem)
+{
+    char problemLine[40];
+    const char *lines[] = {
+        "This port loads the game's",
+        "graphics and sounds from",
+        "your own ROM. Needed:",
+        "> Pokemon Emerald Rogue",
+        "> EX v2.2.1 (.gba, 32 MB)",
+        "Copy the .gba file to:",
+#ifdef __vita__
+        "> ux0:data/pokeemerald_rogue",
+#else
+        "> the game's folder",
+#endif
+        "",
+        problemLine,
+        "Press any button to quit",
+        NULL,
+    };
+    SDL_Event event;
+    bool waiting = true;
+
+    snprintf(problemLine, sizeof(problemLine), "Problem: %s", problem);
+    Frontend_DrawNotice(sMenuFrame, "GAME DATA NEEDED", lines);
+    SDL_UpdateTexture(sdlTexture, NULL, sMenuFrame, DISPLAY_WIDTH * sizeof(Uint16));
+    while (waiting)
+    {
+        PresentFrame();
+        SDL_Delay(16);
+        while (SDL_PollEvent(&event))
+            if (event.type == SDL_QUIT || event.type == SDL_KEYDOWN || event.type == SDL_CONTROLLERBUTTONDOWN
+             || event.type == SDL_JOYBUTTONDOWN || event.type == SDL_FINGERDOWN)
+                waiting = false;
+#ifdef __vita__
+        {
+            // Vita buttons are read directly; wait for a fresh press
+            static int sFrames;
+            static uint32_t sHeld;
+            uint32_t phys = GetVitaPhys();
+            if (++sFrames > 30 && (phys & ~sHeld))
+                waiting = false;
+            sHeld = phys;
+        }
+#endif
+        if (sHeadless)
+        {
+            memcpy(sFrameImage, sMenuFrame, sizeof(sMenuFrame)); // DumpFrame saves sFrameImage
+            DumpFrame(0);
+            waiting = false;
+        }
     }
 }
 

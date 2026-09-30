@@ -517,6 +517,17 @@ void Frontend_DrawMenu(uint16_t *frame)
     }
 }
 
+void Frontend_DrawNotice(uint16_t *frame, const char *title, const char *const *lines)
+{
+    int i;
+
+    FillRect(frame, 0, 0, W, H, 0x8000);
+    FillRect(frame, 6, 4, W - 12, H - 8, COLOR_PANEL);
+    DrawText(frame, 12, 8, title, COLOR_TITLE);
+    for (i = 0; lines[i] != NULL; i++)
+        DrawText(frame, 12, 22 + i * 10, lines[i], lines[i][0] == '>' ? COLOR_SELECTED : COLOR_TEXT);
+}
+
 void Frontend_DrawMessage(uint16_t *frame)
 {
     if (sMessageTimer <= 0)

@@ -6,6 +6,9 @@
 #  - .word/.4byte -> .int, .hword/.2byte -> .short, .align N -> .p2align N
 #  - drops ARM/ELF-only directives (.thumb, .arm, .type, .size, .ltorg ...)
 #  - normalises custom sections to .data
+#  - ROM_ASSETS builds ($ROM_ASSETS_STRIP set): .incbin of a listed asset file
+#    becomes a same-size placeholder (marker + zeros) that the port fills from
+#    the player's ROM at startup (src/platform/rom_assets.c)
 import sys, os, re
 
 SEARCH = ['.', 'sound', 'include']
@@ -19,6 +22,40 @@ SUBS = [
     (re.compile(r'(^|[\s:;])\.4bye(\s)'), r'\1.int\2'),
 ]
 KNOWN_SECTIONS = {'.rodata', '.data', '.bss', '.text'}
+INCBIN = re.compile(r'^(.*?)\.incbin\s+"([^"]+)"\s*$')
+
+
+def load_stripped():
+    path = os.environ.get('ROM_ASSETS_STRIP')
+    assets = {}
+    if path:
+        with open(path) as f:
+            for line in f:
+                if line.startswith('#'):
+                    continue
+                parts = line.split(None, 1)
+                if len(parts) == 2:
+                    assets[parts[1].strip()] = int(parts[0], 16)
+    return assets
+
+
+STRIPPED = load_stripped()
+
+
+def placeholder(prefix, path):
+    """marker + zeros instead of the file's bytes, or None to keep the .incbin"""
+    aid = STRIPPED.get(path)
+    if aid is None or not os.path.isfile(path):
+        return None
+    size = os.path.getsize(path)
+    if size < 8:
+        return None
+    marker = [0x7F, 0x52, 0x41, 0x53, aid & 0xFF, (aid >> 8) & 0xFF, (aid >> 16) & 0xFF, (aid >> 24) & 0xFF]
+    lines = [prefix.rstrip()] if prefix.strip() else []
+    lines.append('\t.byte ' + ','.join('0x%02x' % b for b in marker))
+    if size > 8:
+        lines.append('\t.space %d' % (size - 8))
+    return lines
 BACKSLASH = chr(92)
 
 
@@ -78,6 +115,13 @@ def process(lines, curdir, out):
                 name = '.data'
             out.append('%s.section %s' % (m.group(1), name))
             continue
+        if STRIPPED:
+            m = INCBIN.match(line)
+            if m:
+                repl = placeholder(m.group(1), m.group(2))
+                if repl is not None:
+                    out.extend(repl)
+                    continue
         for rx, rep in SUBS:
             line = rx.sub(rep, line)
         line = ALIGN.sub(r'\1.p2align\2', line)

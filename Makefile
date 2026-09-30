@@ -27,6 +27,14 @@ TARGET_PLATFORM ?= PLATFORM_SDL2
 TILE_RENDERER ?= RENDERER_FAST_DRAW
 
 ifeq ($(PORTABLE),1)
+ifeq ($(TARGET_OS),VITA)
+ROM_ASSETS ?= 1
+endif
+ROM_ASSETS ?= 0
+ifeq ($(ROM_ASSETS),1)
+CPPFLAGS_ROM_ASSETS := -DROM_ASSETS=1
+export ROM_ASSETS_STRIP := $(CURDIR)/tools/pc/rom_assets_strip.txt
+endif
 ifeq ($(TARGET_OS),WINDOWS)
 PREFIX := i686-w64-mingw32-
 HOST_ARCH_FLAGS := -m32
@@ -41,7 +49,9 @@ else
 PREFIX :=
 HOST_ARCH_FLAGS := -m32
 HOST_AS_FLAGS := --32
-# ASAN=1: AddressSanitizer build for the test harness (tools/pc/battle_coverage.sh)
+# ROM_ASSETS=1: graphics/sounds/maps are not embedded but loaded at startup from
+# the player's own ROM (src/platform/rom_assets.c, tools/pc/rom_assets.py).
+# Always on for the Vita, optional on Linux.
 ifeq ($(ASAN),1)
 HOST_ARCH_FLAGS += -fsanitize=address -fsanitize-recover=address -fno-omit-frame-pointer
 endif
@@ -216,6 +226,8 @@ ROM := pokeemerald_rogue
 endif
 ifeq ($(ASAN),1)
 OBJ_DIR := $(OBJ_BASE_DIR_NAME)/pc_$(TARGET_OS)_asan_$(BUILD_CONFIG)
+else ifeq ($(ROM_ASSETS)$(TARGET_OS),1LINUX)
+OBJ_DIR := $(OBJ_BASE_DIR_NAME)/pc_$(TARGET_OS)_romassets_$(BUILD_CONFIG)
 else
 OBJ_DIR := $(OBJ_BASE_DIR_NAME)/pc_$(TARGET_OS)_$(BUILD_CONFIG)
 endif
@@ -267,7 +279,7 @@ endif
 CPPFLAGS := -iquote include -iquote $(GFLIB_SUBDIR) -Wno-trigraphs -DMODERN=$(MODERN) -DTESTING=$(TEST) -std=gnu17
 ifeq ($(PORTABLE),1)
 CPP := $(PREFIX)gcc $(HOST_ARCH_FLAGS) -E
-CPPFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -D PORTABLE -D NONMATCHING -D UBFIX -D $(TARGET_PLATFORM) -D $(TILE_RENDERER) -D TARGET_$(TARGET_OS)
+CPPFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0 -D PORTABLE -D NONMATCHING -D UBFIX -D $(TARGET_PLATFORM) -D $(TILE_RENDERER) -D TARGET_$(TARGET_OS) $(CPPFLAGS_ROM_ASSETS)
 ifeq ($(TARGET_OS),WINDOWS)
 SDL_DIR ?= SDL2/i686-w64-mingw32
 CPPFLAGS += -I $(SDL_DIR)/include -DSDL_DISABLE_IMMINTRIN_H -DSDL_DISABLE_MMINTRIN_H -DSDL_DISABLE_XMMINTRIN_H -DSDL_DISABLE_EMMINTRIN_H -DSDL_DISABLE_PMMINTRIN_H
@@ -685,7 +697,8 @@ endif
 # renamed so the platform layer can snapshot all game state (save states,
 # resets). The platform side (SDL, menu) stays outside. Needs ELF (__start_/
 # __stop_ symbols), so Windows links as before.
-PLATFORM_SIDE_OBJS := src/platform/sdl2.o src/platform/frontend.o src/platform/savestate.o src/platform/nulltrap.o
+PLATFORM_SIDE_OBJS := src/platform/sdl2.o src/platform/frontend.o src/platform/savestate.o src/platform/nulltrap.o \
+                      src/platform/rom_assets.o src/platform/rom_assets_table.o
 GAME_SIDE_OBJS = $(filter-out $(PLATFORM_SIDE_OBJS),$(OBJS_REL))
 ifeq ($(TARGET_OS),WINDOWS)
 LINK_OBJS = $(OBJS_REL)
@@ -697,7 +710,14 @@ LD_R := $(PREFIX)ld -r -d
 else
 LD_R := ld -m elf_i386 -r -d
 endif
-PRELINK = $(LD_R) -o game_combined.o $(GAME_SIDE_OBJS) && $(OBJCOPY) --rename-section .data=gamedata --rename-section .bss=gamebss game_combined.o
+ifeq ($(ROM_ASSETS),1)
+# the asset placeholders are filled at startup: game constants must be writable.
+# Rename first, set the flags separately: flags given with --rename-section
+# drop the section's relocations (pointer tables would become NULL)
+ROM_ASSETS_SECTIONS := --rename-section .rodata=gamerodata
+ROM_ASSETS_FLAGS := && $(OBJCOPY) --set-section-flags gamerodata=alloc,load,contents,data game_combined.o
+endif
+PRELINK = $(LD_R) -o game_combined.o $(GAME_SIDE_OBJS) && $(OBJCOPY) --rename-section .data=gamedata --rename-section .bss=gamebss $(ROM_ASSETS_SECTIONS) game_combined.o $(ROM_ASSETS_FLAGS)
 endif
 
 $(OBJ_DIR)/res.o: $(C_SUBDIR)/platform/win32res/res.rc $(C_SUBDIR)/platform/win32res/icon.ico

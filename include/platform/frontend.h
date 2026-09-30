@@ -88,6 +88,8 @@ void Frontend_DrawMenu(uint16_t *frame);
 void Frontend_ShowMessage(const char *msg);
 // Draws a pending short message (e.g. "State saved") over the game frame
 void Frontend_DrawMessage(uint16_t *frame);
+// Full screen text page (e.g. "game data needed"); lines end with NULL
+void Frontend_DrawNotice(uint16_t *frame, const char *title, const char *const *lines);
 
 int Frontend_StateSlot(void);
 const char *Frontend_StatePath(void);

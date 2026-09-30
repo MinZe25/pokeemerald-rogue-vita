@@ -79,8 +79,10 @@ jobs:
           body: |
             Native PS Vita port of Pokémon Emerald Rogue (not an emulator).
 
-            **Install:** copy `pokeemerald_rogue.vpk` to the Vita and install it with VitaShell.
-            Saves live in `ux0:data/pokeemerald_rogue/`. Updating over an existing install keeps them.
+            **Requires your own ROM of Pokémon Emerald Rogue EX v2.2.1** (the official 2.2.1 patch applied to your Pokémon Emerald ROM; 32 MB `.gba`, SHA-1 `7600af1fe08444c850c3c1227fd7dfd81336ae8e`). The VPK contains no game data: graphics, sounds and maps are loaded from that ROM at startup.
+
+            **Install:** install `pokeemerald_rogue.vpk` with VitaShell and copy your `.gba` into `ux0:data/pokeemerald_rogue/`.
+            Saves live in the same folder. Updating over an existing install keeps them.
             If the bubble or LiveArea art does not change after an update, delete the app and install it again (saves are kept).
 
             **Menu:** Square (remappable) or tap the touch screen: save states, scaling, filter, fast forward, button remapping, save files, save anywhere.
