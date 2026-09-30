@@ -41,6 +41,10 @@ else
 PREFIX :=
 HOST_ARCH_FLAGS := -m32
 HOST_AS_FLAGS := --32
+# ASAN=1: AddressSanitizer build for the test harness (tools/pc/battle_coverage.sh)
+ifeq ($(ASAN),1)
+HOST_ARCH_FLAGS += -fsanitize=address -fsanitize-recover=address -fno-omit-frame-pointer
+endif
 endif
 else
 PREFIX := arm-none-eabi-
@@ -205,10 +209,16 @@ ifeq ($(TARGET_OS),WINDOWS)
 ROM := pokeemerald_rogue.exe
 else ifeq ($(TARGET_OS),VITA)
 ROM := pokeemerald_rogue.vpk
+else ifeq ($(ASAN),1)
+ROM := pokeemerald_rogue_asan
 else
 ROM := pokeemerald_rogue
 endif
+ifeq ($(ASAN),1)
+OBJ_DIR := $(OBJ_BASE_DIR_NAME)/pc_$(TARGET_OS)_asan_$(BUILD_CONFIG)
+else
 OBJ_DIR := $(OBJ_BASE_DIR_NAME)/pc_$(TARGET_OS)_$(BUILD_CONFIG)
+endif
 TESTELF = pc-test-unused.elf
 ELF = $(OBJ_DIR)/unused.elf
 MAP = $(OBJ_DIR)/unused.map

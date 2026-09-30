@@ -245,7 +245,8 @@ void ShrinkBagItems(void)
 
 void CopyItemName(u16 itemId, u8 *dst)
 {
-    CopyItemNameN(itemId, dst, ITEM_NAME_LENGTH);
+    // + 1: room for the terminator of a full length (16 char) name
+    CopyItemNameN(itemId, dst, ITEM_NAME_LENGTH + 1);
 }
 
 static const u8 sText_Revised[] = _("{REVISED_EDIT}");
@@ -259,15 +260,15 @@ void CopyItemNameN(u16 itemId, u8 *dst, u16 length)
 
         if(itemId >= ITEM_TR01 && itemId <= ITEM_TR50)
         {
-            StringCopyN(dst, gText_TRPrefix, length);
+            StringCopy(dst, gText_TRPrefix);
         }
         else if(itemId >= ITEM_HM01 && itemId <= ITEM_HM08)
         {
-            StringCopyN(dst, gText_HMPrefix, length);
+            StringCopy(dst, gText_HMPrefix);
         }
         else
         {
-            StringCopyN(dst, gText_TMPrefix, length);
+            StringCopy(dst, gText_TMPrefix);
         }
 
         if(Rogue_HasMoveBeenRevised(moveId))
@@ -279,7 +280,14 @@ void CopyItemNameN(u16 itemId, u8 *dst, u16 length)
     }
     else
     {
-        StringCopyN(dst, ItemId_GetName(itemId), length);
+        // names fill all ITEM_NAME_LENGTH bytes without an EOS when they are
+        // that long: copy up to the terminator and always end the string
+        const u8 *name = ItemId_GetName(itemId);
+        u16 i;
+        for (i = 0; i < length && i < ITEM_NAME_LENGTH && name[i] != EOS; i++)
+            dst[i] = name[i];
+        if (i < length)
+            dst[i] = EOS;
     }
 }
 

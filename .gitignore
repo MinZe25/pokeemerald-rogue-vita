@@ -58,3 +58,6 @@ data/specials_local.inc
 /pokeemerald_rogue.vpk
 /frame_*.bmp
 /game_combined.o
+
+/pokeemerald_rogue_asan
+/coverage_out/

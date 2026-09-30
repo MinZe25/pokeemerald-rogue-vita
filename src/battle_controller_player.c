@@ -260,6 +260,25 @@ static u32 GetNextBall(u32 ballId)
 }
 #endif
 
+#ifdef PORTABLE
+static void HandleInputChooseAction(u32 battler);
+
+// PC test harness (src/pc_harness.c): which input handler a player battler is in
+// 1 = choose action, 2 = choose move, 3 = choose target, 0 = anything else
+int Harness_PlayerControllerState(u32 battler)
+{
+    void (*func)(u32) = gBattlerControllerFuncs[battler];
+
+    if (func == HandleInputChooseAction)
+        return 1;
+    if (func == HandleInputChooseMove)
+        return 2;
+    if (func == HandleInputChooseTarget)
+        return 3;
+    return 0;
+}
+#endif
+
 static void HandleInputChooseAction(u32 battler)
 {
     u16 itemId = gBattleResources->bufferA[battler][2] | (gBattleResources->bufferA[battler][3] << 8);

@@ -623,7 +623,7 @@ BattleScript_EffectDoodle::
 	setbyte gBattleCommunication, 0
 	goto BattleScript_EffectDoodle_AfterCopy
 BattleScript_EffectDoodle_CopyAbility:
-	trycopyability BS_ATTACKER, BattleScript_MoveEnd
+	trycopyability BS_ATTACKER, BattleScript_EffectDoodle_End
 BattleScript_EffectDoodle_AfterCopy:
 .if B_ABILITY_POP_UP == TRUE
 	copybyte gBattlerAbility, gBattlerAttacker
@@ -633,11 +633,16 @@ BattleScript_EffectDoodle_AfterCopy:
 	printstring STRINGID_PKMNCOPIEDFOE
 	waitmessage B_WAIT_TIME_LONG
 	switchinabilities BS_ATTACKER
-	jumpifbyte CMP_NOT_EQUAL, gBattleCommunication, 0x0, BattleScript_MoveEnd
+	jumpifbyte CMP_NOT_EQUAL, gBattleCommunication, 0x0, BattleScript_EffectDoodle_End
 	addbyte gBattleCommunication, 1
 	jumpifnoally BS_ATTACKER, BattleScript_MoveEnd
 	setallytonextattacker BattleScript_EffectDoodle_CopyAbility
 	goto BattleScript_MoveEnd
+
+@ the ally's copy ran with the ally as attacker: end the move as its user,
+@ or the turn order never finishes (endless Doodles in double battles)
+BattleScript_EffectDoodle_End:
+	setallytonextattacker BattleScript_MoveEnd
 
 BattleScript_EffectChillyReception::
 	printstring STRINGID_PKMNTELLCHILLINGRECEPTIONJOKE
@@ -2048,6 +2053,9 @@ BattleScript_EffectMagneticFluxTrySpDef:
 	waitmessage B_WAIT_TIME_LONG
 BattleScript_EffectMagneticFluxLoop:
 	jumpifbytenotequal gBattlerTarget, gBattlerAttacker, BattleScript_EffectMagneticFluxEnd
+	@ singles: no ally, "target + 2" would be a battler that does not exist
+	@ (stale gBattleMons data from an earlier double battle -> endless wait)
+	jumpifnoally BS_TARGET, BattleScript_EffectMagneticFluxEnd
 	setallytonexttarget BattleScript_EffectMagneticFluxStart
 BattleScript_EffectMagneticFluxEnd:
 	jumpifbyte CMP_NOT_EQUAL, gBattleCommunication, 0, BattleScript_MoveEnd
@@ -2087,6 +2095,9 @@ BattleScript_EffectGearUpTrySpAtk:
 	waitmessage B_WAIT_TIME_LONG
 BattleScript_EffectGearUpLoop:
 	jumpifbytenotequal gBattlerTarget, gBattlerAttacker, BattleScript_EffectGearUpEnd
+	@ singles: no ally, "target + 2" would be a battler that does not exist
+	@ (stale gBattleMons data from an earlier double battle -> endless wait)
+	jumpifnoally BS_TARGET, BattleScript_EffectGearUpEnd
 	setallytonexttarget BattleScript_EffectGearUpStart
 BattleScript_EffectGearUpEnd:
 	jumpifbyte CMP_NOT_EQUAL, gBattleCommunication, 0, BattleScript_MoveEnd
