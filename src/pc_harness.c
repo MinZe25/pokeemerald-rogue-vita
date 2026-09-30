@@ -217,3 +217,443 @@ void Harness_SoundTestFrame(unsigned long t)
     }
 }
 #endif
+
+#ifdef PORTABLE
+// ---- battle coverage -------------------------------------------------------
+// ROGUE_COVERAGE=<pass>:<first>:<last>  (pass = moves | abilities | megas)
+// Plays one short wild battle per case, deterministic from the case id:
+//   moves      every move, used by both sides, 5 terrain/weather variants each
+//              (case = variant * (MOVES_COUNT - 1) + move - 1), some doubles
+//   abilities  every ability that some species has, on the player and enemy
+//   megas      every mega / primal / ultra burst species holding its item,
+//              the player triggers the gimmick in the move menu
+// The harness drives the battle menus itself and ends each battle after a few
+// turns. Problems are logged by src/platform/nulltrap.c, tagged with the case.
+#include <string.h>
+#include "characters.h"
+#include "battle.h"
+#include "battle_anim.h"
+#include "battle_controllers.h"
+#include "battle_main.h"
+#include "sprite.h"
+#include "task.h"
+#include "battle_util.h"
+#include "random.h"
+#include "constants/abilities.h"
+#include "constants/battle.h"
+#include "constants/form_change_types.h"
+#include "constants/moves.h"
+
+int Harness_PlayerControllerState(u32 battler);
+void NullTrap_Note(const char *line);
+void exit(int status); // <stdlib.h> clashes with the game's macros
+void Platform_DumpFrameNow(void);
+
+enum { COV_NONE, COV_MOVES, COV_ABILITIES, COV_MEGAS };
+#define COV_ENV_VARIANTS 5
+#define COV_TURNS        3      // turns of move use before the battle is ended
+#define COV_CASE_FRAMES  36000  // longer than this: hang
+
+static int sCovPass;
+static u32 sCovCase, sCovLast, sCovCaseFrames, sCovIdle;
+static bool8 sCovInBattle, sCovEnvDone, sCovStarted;
+static u32 sCovPhase;
+static char sCovTag[48] = "-";
+static u16 sCovMegaSpecies[256], sCovMegaItem[256];
+static int sCovMegaCount = -1;
+
+const char *NullTrap_CaseTag(void)
+{
+    return sCovTag;
+}
+
+static void GameToAscii(const u8 *s, char *out, int n)
+{
+    int i = 0;
+    for (; *s != EOS && i < n - 1; s++)
+    {
+        u8 c = *s;
+        if (c >= 0xBB && c <= 0xD4) out[i++] = 'A' + (c - 0xBB);
+        else if (c >= 0xD5 && c <= 0xEE) out[i++] = 'a' + (c - 0xD5);
+        else if (c >= 0xA1 && c <= 0xAA) out[i++] = '0' + (c - 0xA1);
+        else if (c == 0x00) out[i++] = ' ';
+        else if (c == 0xAE) out[i++] = '-';
+        else out[i++] = '?';
+    }
+    out[i] = 0;
+}
+
+static u16 CovMove(void)
+{
+    return 1 + FuzzRand(MOVES_COUNT - 1);
+}
+
+static void CovSetMoves(struct Pokemon *mon, u16 m0, u16 m1, u16 m2, u16 m3)
+{
+    u16 moves[4] = { m0, m1, m2, m3 };
+    int i;
+    for (i = 0; i < 4; i++)
+    {
+        u8 pp = gBattleMoves[moves[i]].pp ? gBattleMoves[moves[i]].pp : 10;
+        SetMonData(mon, MON_DATA_MOVE1 + i, &moves[i]);
+        SetMonData(mon, MON_DATA_PP1 + i, &pp);
+    }
+}
+
+static void CovCreateMon(struct Pokemon *mon, u16 species, u8 abilityNum, u16 item)
+{
+    CreateMon(mon, species, 70 + FuzzRand(21), 20, TRUE, FuzzRand(0xFFFF) << 16 | FuzzRand(0xFFFF), OT_ID_PLAYER_ID, 0);
+    SetMonData(mon, MON_DATA_ABILITY_NUM, &abilityNum);
+    SetMonData(mon, MON_DATA_HELD_ITEM, &item);
+}
+
+// first species (from a case-dependent start) that has the ability
+static bool8 CovFindAbility(u16 ability, u32 start, u16 *species, u8 *abilityNum)
+{
+    u32 i;
+    int n;
+    for (i = 0; i < NUM_SPECIES; i++)
+    {
+        u16 s = 1 + (start + i) % (NUM_SPECIES - 1);
+        if (gSpeciesInfo[s].baseHP == 0)
+            continue;
+        for (n = 0; n < NUM_ABILITY_SLOTS; n++)
+            if (gSpeciesInfo[s].abilities[n] == ability)
+            {
+                *species = s;
+                *abilityNum = n;
+                return TRUE;
+            }
+    }
+    return FALSE;
+}
+
+static void CovBuildMegaList(void)
+{
+    u32 s;
+    sCovMegaCount = 0;
+    for (s = 1; s < NUM_SPECIES && sCovMegaCount < (int)ARRAY_COUNT(sCovMegaSpecies); s++)
+    {
+        const struct FormChange *f = GetSpeciesFormChanges(s);
+        if (f == NULL || gSpeciesInfo[s].baseHP == 0)
+            continue;
+        for (; f->method != FORM_CHANGE_TERMINATOR; f++)
+            if (f->method == FORM_CHANGE_BATTLE_MEGA_EVOLUTION_ITEM || f->method == FORM_CHANGE_BATTLE_PRIMAL_REVERSION
+             || f->method == FORM_CHANGE_BATTLE_ULTRA_BURST)
+            {
+                sCovMegaSpecies[sCovMegaCount] = s;
+                sCovMegaItem[sCovMegaCount] = f->param1;
+                sCovMegaCount++;
+                break;
+            }
+    }
+}
+
+// Sets up the parties for the case and starts the battle
+static void CovStartCase(void)
+{
+    static const u32 sTerrains[] = { 0, STATUS_FIELD_ELECTRIC_TERRAIN, STATUS_FIELD_GRASSY_TERRAIN, STATUS_FIELD_MISTY_TERRAIN, STATUS_FIELD_PSYCHIC_TERRAIN };
+    char line[200], name[32], name2[32];
+    u16 pSpecies = 0, eSpecies = 0, pItem = ITEM_NONE, eItem = ITEM_NONE, move = MOVE_NONE, m[4];
+    u8 pAbility = FuzzRand(3), eAbility = FuzzRand(3);
+    bool8 doubles = FALSE;
+    int i;
+
+    sFuzzRng = sCovCase * 2654435761u + sCovPass * 97 + 1;
+    SeedRng(sCovCase * 7919 + sCovPass);
+    m[0] = CovMove(); m[1] = CovMove(); m[2] = CovMove(); m[3] = CovMove();
+
+    switch (sCovPass)
+    {
+    case COV_MOVES:
+    {
+        u32 variant = sCovCase / (MOVES_COUNT - 1);
+        move = 1 + sCovCase % (MOVES_COUNT - 1);
+        pSpecies = FuzzSpecies();
+        eSpecies = FuzzSpecies();
+        doubles = (move + variant) % 3 == 0;
+        if (FuzzRand(3) == 0) pItem = 1 + FuzzRand(ITEMS_COUNT - 1);
+        if (FuzzRand(3) == 0) eItem = 1 + FuzzRand(ITEMS_COUNT - 1);
+        GameToAscii(gMoveNames[move], name, sizeof(name));
+        snprintf(sCovTag, sizeof(sCovTag), "moves:%lu", (unsigned long)sCovCase);
+        snprintf(line, sizeof(line), "CASE %s move=%d(%s) variant=%lu doubles=%d species=%d/%d items=%d/%d\n",
+                 sCovTag, move, name, (unsigned long)variant, doubles, pSpecies, eSpecies, pItem, eItem);
+        m[0] = m[1] = m[2] = m[3] = move;
+        break;
+    }
+    case COV_ABILITIES:
+    {
+        u16 ability = 1 + sCovCase, eAbilityId = 1 + (sCovCase * 37 + 11) % (ABILITIES_COUNT - 1);
+        if (!CovFindAbility(ability, sCovCase * 131, &pSpecies, &pAbility))
+        {
+            GameToAscii(gAbilityNames[ability], name, sizeof(name));
+            snprintf(line, sizeof(line), "SKIP abilities:%lu ability=%d(%s) no species has it\n", (unsigned long)sCovCase, ability, name);
+            printf("%s", line);
+            NullTrap_Note(line);
+            sCovStarted = FALSE;
+            return;
+        }
+        if (!CovFindAbility(eAbilityId, sCovCase * 17, &eSpecies, &eAbility))
+            eSpecies = FuzzSpecies();
+        doubles = sCovCase % 3 == 0;
+        GameToAscii(gAbilityNames[ability], name, sizeof(name));
+        GameToAscii(gAbilityNames[eAbilityId], name2, sizeof(name2));
+        snprintf(sCovTag, sizeof(sCovTag), "abilities:%lu", (unsigned long)sCovCase);
+        snprintf(line, sizeof(line), "CASE %s ability=%d(%s) vs %d(%s) doubles=%d species=%d/%d moves=%d,%d,%d,%d\n",
+                 sCovTag, ability, name, eAbilityId, name2, doubles, pSpecies, eSpecies, m[0], m[1], m[2], m[3]);
+        break;
+    }
+    case COV_MEGAS:
+        if (sCovMegaCount < 0)
+            CovBuildMegaList();
+        if ((int)sCovCase >= sCovMegaCount)
+        {
+            sCovStarted = FALSE;
+            return;
+        }
+        pSpecies = sCovMegaSpecies[sCovCase];
+        pItem = sCovMegaItem[sCovCase];
+        eSpecies = FuzzSpecies();
+        doubles = sCovCase % 3 == 0;
+        snprintf(sCovTag, sizeof(sCovTag), "megas:%lu", (unsigned long)sCovCase);
+        snprintf(line, sizeof(line), "CASE %s species=%d item=%d vs %d doubles=%d moves=%d,%d,%d,%d\n",
+                 sCovTag, pSpecies, pItem, eSpecies, doubles, m[0], m[1], m[2], m[3]);
+        break;
+    }
+    printf("%s", line);
+    fflush(stdout);
+    NullTrap_Note(line);
+
+    ZeroPlayerPartyMons();
+    for (i = 0; i < (doubles ? 2 : 1); i++)
+    {
+        CovCreateMon(&gPlayerParty[i], i == 0 ? pSpecies : FuzzSpecies(), i == 0 ? pAbility : FuzzRand(3), i == 0 ? pItem : ITEM_NONE);
+        CovSetMoves(&gPlayerParty[i], m[0], m[1], m[2], m[3]);
+    }
+    CalculatePlayerPartyCount();
+
+    if (doubles)
+        CreateScriptedDoubleWildMon(eSpecies, 50, ITEM_NONE, FALSE, FuzzSpecies(), 50, ITEM_NONE, FALSE);
+    else
+        CreateScriptedWildMon(eSpecies, 50, ITEM_NONE, FALSE);
+    for (i = 0; i < (doubles ? 2 : 1); i++)
+    {
+        u16 item = i == 0 ? eItem : ITEM_NONE;
+        u8 num = i == 0 ? eAbility : FuzzRand(3);
+        // Rogue scales scripted wild mons to the hub level: recreate them
+        // strong enough to last a few turns
+        CovCreateMon(&gEnemyParty[i], GetMonData(&gEnemyParty[i], MON_DATA_SPECIES), num, item);
+        if (sCovPass == COV_MOVES)
+            CovSetMoves(&gEnemyParty[i], move, move, move, move);
+        else
+            CovSetMoves(&gEnemyParty[i], CovMove(), CovMove(), CovMove(), CovMove());
+    }
+    if (doubles)
+        BattleSetup_StartScriptedDoubleWildBattle();
+    else
+        BattleSetup_StartScriptedWildBattle();
+
+    // field conditions applied when the first turn starts
+    sCovEnvDone = FALSE;
+    (void)sTerrains;
+}
+
+static void CovApplyEnvironment(void)
+{
+    static const u32 sTerrains[] = { 0, STATUS_FIELD_ELECTRIC_TERRAIN, STATUS_FIELD_GRASSY_TERRAIN, STATUS_FIELD_MISTY_TERRAIN, STATUS_FIELD_PSYCHIC_TERRAIN };
+    static const u16 sWeathers[] = { 0, B_WEATHER_RAIN_TEMPORARY, B_WEATHER_SUN_TEMPORARY, B_WEATHER_SANDSTORM_TEMPORARY, B_WEATHER_HAIL_TEMPORARY, B_WEATHER_SNOW_TEMPORARY };
+    u32 a = sCovCase % (MOVES_COUNT - 1), b = sCovCase / (MOVES_COUNT - 1);
+
+    if (sCovPass != COV_MOVES)
+    {
+        a = sCovCase;
+        b = sCovCase / 5;
+    }
+    gFieldStatuses &= ~STATUS_FIELD_TERRAIN_ANY;
+    gFieldStatuses |= sTerrains[(a + b) % 5];
+    gFieldTimers.terrainTimer = 5;
+    gBattleWeather = sWeathers[(a * 3 + b) % 6];
+    gWishFutureKnock.weatherDuration = 5;
+    if ((a + b) % 4 == 0)
+    {
+        gFieldStatuses |= STATUS_FIELD_TRICK_ROOM;
+        gFieldTimers.trickRoomTimer = 5;
+    }
+}
+
+static u16 CovBattleKeys(void)
+{
+    int b;
+    for (b = 0; b < MAX_BATTLERS_COUNT; b += 2) // player left / right
+    {
+        if (b >= gBattlersCount)
+            break;
+        switch (Harness_PlayerControllerState(b))
+        {
+        case 1: // choose action: fight; past the turn limit, end the battle
+            if (!sCovEnvDone)
+            {
+                CovApplyEnvironment();
+                sCovEnvDone = TRUE;
+            }
+            if (gBattleResults.battleTurnCounter >= COV_TURNS)
+                gBattleOutcome = B_OUTCOME_RAN;
+            // PP drained (Spite, Eerie Spell, 1 PP moves...): top up, or the
+            // move menu refuses every move and the test never ends
+            {
+                int i;
+                for (i = 0; i < MAX_MON_MOVES; i++)
+                    if (gBattleMons[b].moves[i] != MOVE_NONE && gBattleMons[b].pp[i] == 0)
+                        gBattleMons[b].pp[i] = 1;
+            }
+            gActionSelectionCursor[b] = 0;
+            return A_BUTTON;
+        case 2: // choose move: trigger the gimmick first in the megas pass
+            if (sCovPass == COV_MEGAS && CanMegaEvolve(b) && !gBattleStruct->mega.playerSelect)
+                return START_BUTTON;
+            if (sCovPass == COV_MEGAS && CanUltraBurst(b) && !gBattleStruct->burst.playerSelect)
+                return START_BUTTON;
+            {
+                // a move with PP left, slot 0 (the move under test) first; when
+                // the game refuses it (Disable, Torment, Taunt...) the next
+                // press tries the next slot
+                static u32 sMoveTries;
+                int i, n;
+                gMoveSelectionCursor[b] = 0;
+                for (n = 0; n < MAX_MON_MOVES; n++)
+                {
+                    i = (n + sMoveTries) % MAX_MON_MOVES;
+                    if (gBattleMons[b].moves[i] != MOVE_NONE && gBattleMons[b].pp[i] > 0)
+                    {
+                        gMoveSelectionCursor[b] = i;
+                        break;
+                    }
+                }
+                sMoveTries++;
+            }
+            return A_BUTTON;
+        case 3: // choose target: if A is refused (e.g. a Commander Tatsugiri), move the cursor
+        {
+            static u32 sTargetPresses;
+            sTargetPresses++;
+            if (sTargetPresses % 4 == 3)
+                return (sTargetPresses & 4) ? DPAD_LEFT : DPAD_RIGHT;
+            return A_BUTTON;
+        }
+        }
+    }
+    // messages, party menu after a faint, ...
+    return (sCovPhase & 8) ? DPAD_DOWN : A_BUTTON;
+}
+
+// Called every frame from the platform layer; returns the keys to press
+u16 Harness_CoverageFrame(const char *spec, unsigned long frame, unsigned long fromFrame)
+{
+    u16 keys = 0;
+
+    if (sCovPass == COV_NONE)
+    {
+        char pass[16] = { 0 };
+        unsigned long first = 0, last = 0;
+        if (!strcmp(spec, "info")) // case counts for tools/pc/battle_coverage.sh
+        {
+            CovBuildMegaList();
+            printf("COVERAGE_INFO moves=%d abilities=%d megas=%d\n",
+                   (MOVES_COUNT - 1) * COV_ENV_VARIANTS, ABILITIES_COUNT - 1, sCovMegaCount);
+            fflush(stdout);
+            exit(0);
+        }
+        if (sscanf(spec, "%15[a-z]:%lu:%lu", pass, &first, &last) < 2)
+            return 0;
+        sCovPass = !strcmp(pass, "moves") ? COV_MOVES : !strcmp(pass, "abilities") ? COV_ABILITIES : COV_MEGAS;
+        sCovCase = first;
+        sCovLast = last ? last : first;
+    }
+    if (frame < fromFrame)
+        return 0;
+
+    sCovPhase++;
+    sCovCaseFrames++;
+    if (sCovStarted && sCovCaseFrames > COV_CASE_FRAMES)
+    {
+        char line[200];
+        int i, sprites = 0, tasks = 0;
+        for (i = 0; i < MAX_SPRITES; i++)
+            sprites += gSprites[i].inUse;
+        for (i = 0; i < NUM_TASKS; i++)
+            tasks += gTasks[i].isActive;
+        snprintf(line, sizeof(line), "HANG %s after %lu frames sprites=%d tasks=%d anim=%d visualTasks=%d soundTasks=%d mainFunc=%p"
+                 " execFlags=0x%x ctrl=%p,%p,%p,%p script=%p action=%d turnAction=%d/%d\n",
+                 sCovTag, (unsigned long)sCovCaseFrames, sprites, tasks, gAnimScriptActive, gAnimVisualTaskCount,
+                 gAnimSoundTaskCount, (void *)gBattleMainFunc, (unsigned)gBattleControllerExecFlags,
+                 (void *)gBattlerControllerFuncs[0], (void *)gBattlerControllerFuncs[1],
+                 (void *)gBattlerControllerFuncs[2], (void *)gBattlerControllerFuncs[3],
+                 (const void *)gBattlescriptCurrInstr, gCurrentActionFuncId, gCurrentTurnActionNumber, gBattlersCount);
+        printf("%s", line);
+        NullTrap_Note(line);
+        for (i = 0; i < gBattlersCount; i++)
+        {
+            struct Sprite *spr = &gSprites[gBattlerSpriteIds[i]];
+            printf("  battler %d: sprite %d inUse=%d invisible=%d y=%d y2=%d callback=%p status3=0x%lx hp=%d\n",
+                   i, gBattlerSpriteIds[i], spr->inUse, spr->invisible, spr->y, spr->y2, (void *)spr->callback,
+                   (unsigned long)gStatuses3[i], gBattleMons[i].hp);
+        }
+        Platform_DumpFrameNow(); // what it was stuck on
+        exit(3);
+    }
+
+    if (gMain.inBattle && gBattleStruct != NULL)
+    {
+        sCovInBattle = TRUE;
+        sCovIdle = 0;
+        if (getenv("ROGUE_COVDEBUG") && sCovCaseFrames % 300 == 0)
+            printf("COVDEBUG f=%lu turn=%d state=%d/%d cursor=%d/%d mainFunc=%p outcome=%d curMove=%d attacker=%d\n",
+                   (unsigned long)sCovCaseFrames, gBattleResults.battleTurnCounter,
+                   Harness_PlayerControllerState(0), gBattlersCount > 2 ? Harness_PlayerControllerState(2) : -1,
+                   gMoveSelectionCursor[0], gBattlersCount > 2 ? gMoveSelectionCursor[2] : -1,
+                   (void *)gBattleMainFunc, gBattleOutcome, gCurrentMove, gBattlerAttacker);
+        if (sCovPhase & 1)
+            return 0; // release between presses so JOY_NEW sees each one
+        return CovBattleKeys();
+    }
+
+    if (gMain.callback2 == CB2_Overworld && !ArePlayerFieldControlsLocked() && !ScriptContext_IsEnabled())
+    {
+        if (++sCovIdle < 30)
+            return 0;
+        sCovIdle = 0;
+        if (sCovStarted && sCovInBattle)
+        {
+            char line[64];
+            snprintf(line, sizeof(line), "DONE %s frames=%lu\n", sCovTag, (unsigned long)sCovCaseFrames);
+            printf("%s", line);
+            NullTrap_Note(line);
+            sCovCase++;
+        }
+        else if (sCovStarted)
+        {
+            return 0; // battle not started yet
+        }
+        if (sCovCase > sCovLast || (sCovPass == COV_MEGAS && sCovMegaCount >= 0 && (int)sCovCase >= sCovMegaCount))
+        {
+            printf("COVERAGE FINISHED\n");
+            NullTrap_Note("COVERAGE FINISHED\n");
+            exit(0);
+        }
+        sCovStarted = TRUE;
+        sCovInBattle = FALSE;
+        sCovCaseFrames = 0;
+        CovStartCase();
+        if (!sCovStarted) // skipped case
+            sCovCase++;
+        return 0;
+    }
+
+    // outside battles: dismiss messages (B does not talk to anyone)
+    sCovIdle = 0;
+    if (sCovPhase & 1)
+        return 0;
+    keys = (sCovPhase & 6) == 0 ? B_BUTTON : 0;
+    return keys;
+}
+#endif

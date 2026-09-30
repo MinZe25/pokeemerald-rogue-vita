@@ -1123,7 +1123,7 @@ static void PrintHpOnHealthbox(u32 spriteId, s16 currHp, s16 maxHp, u32 bgColor,
     txtPtr = ConvertIntToDecimalStringN(txtPtr, maxHp, STR_CONV_MODE_LEFT_ALIGN, 4);
 
     {
-        u8 text2[12], *txtPtr2;
+        u8 text2[32], *txtPtr2; // was 12: the color prefix + 6 chars + EOS overflowed it
 
         txtPtr2 = StringCopy(text2, sEmptyWhiteText_TransparentHighlightMinimal);
         txtPtr2 = StringCopy(txtPtr2, txtPtr - 6);

@@ -4,8 +4,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// Save states need the linker defined __start_/__stop_ section symbols (ELF)
-#if defined(__vita__) || defined(__linux__)
+// Save states need the linker defined __start_/__stop_ section symbols (ELF).
+// Not in AddressSanitizer builds: copying whole sections reads ASan's redzones.
+#if (defined(__vita__) || defined(__linux__)) && !defined(__SANITIZE_ADDRESS__)
 #define SAVESTATES_SUPPORTED
 #endif
 

@@ -1,6 +1,16 @@
 #ifndef GUARD_BATTLE_H
 #define GUARD_BATTLE_H
 
+#ifdef PORTABLE
+// Battler-indexed globals get one spare slot on PC/Vita. Field-wide battle
+// scripts (Perish Song, Flower Shield...) loop gBattlerTarget up to
+// gBattlersCount and moveend then indexes these arrays with 4: on GBA that
+// spills into the next variable, here it would corrupt whatever follows.
+#define BATTLER_ARRAY_COUNT (MAX_BATTLERS_COUNT + 1)
+#else
+#define BATTLER_ARRAY_COUNT MAX_BATTLERS_COUNT
+#endif
+
 // should they be included here or included individually by every file?
 #include "constants/battle.h"
 #include "constants/form_change_types.h"
@@ -1024,14 +1034,14 @@ extern u8 *gBattleAnimBgTileBuffer;
 extern u8 *gBattleAnimBgTilemapBuffer;
 extern u32 gBattleControllerExecFlags;
 extern u8 gBattlersCount;
-extern u16 gBattlerPartyIndexes[MAX_BATTLERS_COUNT];
-extern u8 gBattlerPositions[MAX_BATTLERS_COUNT];
-extern u8 gActionsByTurnOrder[MAX_BATTLERS_COUNT];
-extern u8 gBattlerByTurnOrder[MAX_BATTLERS_COUNT];
+extern u16 gBattlerPartyIndexes[BATTLER_ARRAY_COUNT];
+extern u8 gBattlerPositions[BATTLER_ARRAY_COUNT];
+extern u8 gActionsByTurnOrder[BATTLER_ARRAY_COUNT];
+extern u8 gBattlerByTurnOrder[BATTLER_ARRAY_COUNT];
 extern u8 gCurrentTurnActionNumber;
 extern u8 gCurrentActionFuncId;
-extern struct BattlePokemon gBattleMons[MAX_BATTLERS_COUNT];
-extern u8 gBattlerSpriteIds[MAX_BATTLERS_COUNT];
+extern struct BattlePokemon gBattleMons[BATTLER_ARRAY_COUNT];
+extern u8 gBattlerSpriteIds[BATTLER_ARRAY_COUNT];
 extern u8 gCurrMovePos;
 extern u8 gChosenMovePos;
 extern u16 gCurrentMove;
@@ -1039,7 +1049,7 @@ extern u16 gChosenMove;
 extern u16 gCalledMove;
 extern s32 gBattleMoveDamage;
 extern s32 gHpDealt;
-extern s32 gBideDmg[MAX_BATTLERS_COUNT];
+extern s32 gBideDmg[BATTLER_ARRAY_COUNT];
 extern u16 gLastUsedItem;
 extern u16 gLastUsedAbility;
 extern u8 gBattlerAttacker;
@@ -1051,51 +1061,51 @@ extern u8 gAbsentBattlerFlags;
 extern u8 gIsCriticalHit;
 extern u8 gMultiHitCounter;
 extern const u8 *gBattlescriptCurrInstr;
-extern u8 gChosenActionByBattler[MAX_BATTLERS_COUNT];
-extern const u8 *gSelectionBattleScripts[MAX_BATTLERS_COUNT];
-extern const u8 *gPalaceSelectionBattleScripts[MAX_BATTLERS_COUNT];
-extern u16 gLastPrintedMoves[MAX_BATTLERS_COUNT];
-extern u16 gLastMoves[MAX_BATTLERS_COUNT];
-extern u16 gLastLandedMoves[MAX_BATTLERS_COUNT];
-extern u16 gLastHitByType[MAX_BATTLERS_COUNT];
-extern u16 gLastResultingMoves[MAX_BATTLERS_COUNT];
-extern u16 gLockedMoves[MAX_BATTLERS_COUNT];
+extern u8 gChosenActionByBattler[BATTLER_ARRAY_COUNT];
+extern const u8 *gSelectionBattleScripts[BATTLER_ARRAY_COUNT];
+extern const u8 *gPalaceSelectionBattleScripts[BATTLER_ARRAY_COUNT];
+extern u16 gLastPrintedMoves[BATTLER_ARRAY_COUNT];
+extern u16 gLastMoves[BATTLER_ARRAY_COUNT];
+extern u16 gLastLandedMoves[BATTLER_ARRAY_COUNT];
+extern u16 gLastHitByType[BATTLER_ARRAY_COUNT];
+extern u16 gLastResultingMoves[BATTLER_ARRAY_COUNT];
+extern u16 gLockedMoves[BATTLER_ARRAY_COUNT];
 extern u16 gLastUsedMove;
-extern u8 gLastHitBy[MAX_BATTLERS_COUNT];
-extern u16 gChosenMoveByBattler[MAX_BATTLERS_COUNT];
+extern u8 gLastHitBy[BATTLER_ARRAY_COUNT];
+extern u16 gChosenMoveByBattler[BATTLER_ARRAY_COUNT];
 extern u16 gMoveResultFlags;
 extern u32 gHitMarker;
-extern u8 gBideTarget[MAX_BATTLERS_COUNT];
+extern u8 gBideTarget[BATTLER_ARRAY_COUNT];
 extern u8 gUnusedFirstBattleVar2;
 extern u32 gSideStatuses[NUM_BATTLE_SIDES];
 extern struct SideTimer gSideTimers[NUM_BATTLE_SIDES];
-extern u32 gStatuses3[MAX_BATTLERS_COUNT];
-extern u32 gStatuses4[MAX_BATTLERS_COUNT];
-extern struct DisableStruct gDisableStructs[MAX_BATTLERS_COUNT];
+extern u32 gStatuses3[BATTLER_ARRAY_COUNT];
+extern u32 gStatuses4[BATTLER_ARRAY_COUNT];
+extern struct DisableStruct gDisableStructs[BATTLER_ARRAY_COUNT];
 extern u16 gPauseCounterBattle;
 extern u16 gPaydayMoney;
 extern u8 gBattleCommunication[BATTLE_COMMUNICATION_ENTRIES_COUNT];
 extern u8 gBattleOutcome;
-extern struct ProtectStruct gProtectStructs[MAX_BATTLERS_COUNT];
-extern struct SpecialStatus gSpecialStatuses[MAX_BATTLERS_COUNT];
+extern struct ProtectStruct gProtectStructs[BATTLER_ARRAY_COUNT];
+extern struct SpecialStatus gSpecialStatuses[BATTLER_ARRAY_COUNT];
 extern u16 gBattleWeather;
 extern struct WishFutureKnock gWishFutureKnock;
 extern u16 gIntroSlideFlags;
 extern u8 gSentPokesToOpponent[2];
-extern struct BattleEnigmaBerry gEnigmaBerries[MAX_BATTLERS_COUNT];
+extern struct BattleEnigmaBerry gEnigmaBerries[BATTLER_ARRAY_COUNT];
 extern struct BattleScripting gBattleScripting;
 extern struct BattleStruct *gBattleStruct;
 extern u8 *gLinkBattleSendBuffer;
 extern u8 *gLinkBattleRecvBuffer;
 extern struct BattleResources *gBattleResources;
-extern u8 gActionSelectionCursor[MAX_BATTLERS_COUNT];
-extern u8 gMoveSelectionCursor[MAX_BATTLERS_COUNT];
-extern u8 gBattlerStatusSummaryTaskId[MAX_BATTLERS_COUNT];
+extern u8 gActionSelectionCursor[BATTLER_ARRAY_COUNT];
+extern u8 gMoveSelectionCursor[BATTLER_ARRAY_COUNT];
+extern u8 gBattlerStatusSummaryTaskId[BATTLER_ARRAY_COUNT];
 extern u8 gBattlerInMenuId;
 extern bool8 gDoingBattleAnim;
-extern u32 gTransformedPersonalities[MAX_BATTLERS_COUNT];
-extern bool8 gTransformedShininess[MAX_BATTLERS_COUNT];
-extern u32 gTransformedOtIds[MAX_BATTLERS_COUNT];
+extern u32 gTransformedPersonalities[BATTLER_ARRAY_COUNT];
+extern bool8 gTransformedShininess[BATTLER_ARRAY_COUNT];
+extern u32 gTransformedOtIds[BATTLER_ARRAY_COUNT];
 extern u8 gPlayerDpadHoldFrames;
 extern struct BattleSpriteData *gBattleSpritesDataPtr;
 extern struct MonSpritesGfx *gMonSpritesGfxPtr;
@@ -1107,13 +1117,13 @@ extern u32 gFieldStatuses;
 extern struct FieldTimer gFieldTimers;
 extern u8 gBattlerAbility;
 extern u16 gPartnerSpriteId;
-extern struct QueuedStatBoost gQueuedStatBoosts[MAX_BATTLERS_COUNT];
+extern struct QueuedStatBoost gQueuedStatBoosts[BATTLER_ARRAY_COUNT];
 
 extern void (*gPreBattleCallback1)(void);
 extern void (*gBattleMainFunc)(void);
 extern struct BattleResults gBattleResults;
 extern u8 gLeveledUpInBattle;
-extern u8 gHealthboxSpriteIds[MAX_BATTLERS_COUNT];
+extern u8 gHealthboxSpriteIds[BATTLER_ARRAY_COUNT];
 extern u8 gMultiUsePlayerCursor;
 extern u8 gNumberOfMovesToChoose;
 extern bool8 gHasFetchedBall;

@@ -99,6 +99,7 @@ static int sStepping;
 static unsigned long sHits;
 
 extern unsigned long NullTrap_CurrentFrame(void);
+extern const char *NullTrap_CaseTag(void); // test case being run (src/pc_harness.c)
 
 static void LogLine(const char *s)
 {
@@ -151,7 +152,7 @@ static void OnFault(int sig, siginfo_t *si, void *ucv)
         {
             if (!SeenSite(pc))
             {
-                snprintf(buf, sizeof(buf), "DIV0 pc=%p frame=%lu\n", (void *)pc, NullTrap_CurrentFrame());
+                snprintf(buf, sizeof(buf), "DIV0 pc=%p frame=%lu case=%s\n", (void *)pc, NullTrap_CurrentFrame(), NullTrap_CaseTag());
                 LogLine(buf);
                 LogBacktrace();
             }
@@ -166,7 +167,7 @@ static void OnFault(int sig, siginfo_t *si, void *ucv)
         sHits++;
         if (!SeenSite(pc))
         {
-            snprintf(buf, sizeof(buf), "NULL pc=%p addr=0x%lx frame=%lu\n", (void *)pc, (unsigned long)addr, NullTrap_CurrentFrame());
+            snprintf(buf, sizeof(buf), "NULL pc=%p addr=0x%lx frame=%lu case=%s\n", (void *)pc, (unsigned long)addr, NullTrap_CurrentFrame(), NullTrap_CaseTag());
             LogLine(buf);
             LogBacktrace();
         }
@@ -177,7 +178,7 @@ static void OnFault(int sig, siginfo_t *si, void *ucv)
     }
 
     // a real crash: record it, then die normally
-    snprintf(buf, sizeof(buf), "CRASH sig=%d pc=%p addr=%p frame=%lu\n", sig, (void *)pc, (void *)addr, NullTrap_CurrentFrame());
+    snprintf(buf, sizeof(buf), "CRASH sig=%d pc=%p addr=%p frame=%lu case=%s\n", sig, (void *)pc, (void *)addr, NullTrap_CurrentFrame(), NullTrap_CaseTag());
     LogLine(buf);
     LogBacktrace();
     signal(sig, SIG_DFL);
@@ -196,6 +197,12 @@ static void OnStep(int sig, siginfo_t *si, void *ucv)
     mprotect((void *)sLow, LOW_SIZE, PROT_NONE);
     uc->uc_mcontext.gregs[REG_EFL] &= ~EFLAGS_TF;
     sStepping = 0;
+}
+
+// free-form line in the log (test case markers)
+void NullTrap_Note(const char *line)
+{
+    LogLine(line);
 }
 
 static void OnExit(void)
@@ -265,8 +272,18 @@ void NullTrap_Init(void)
     AddVectoredExceptionHandler(1, OnException);
 }
 
+void NullTrap_Note(const char *line)
+{
+    (void)line;
+}
+
 #else
 void NullTrap_Init(void)
 {
+}
+
+void NullTrap_Note(const char *line)
+{
+    (void)line;
 }
 #endif

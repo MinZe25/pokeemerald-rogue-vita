@@ -1992,7 +1992,7 @@ s32 CalcCritChanceStageArgs(u32 battlerAtk, u32 battlerDef, u32 move, bool32 rec
 {
     s32 critChance = 0;
 
-    if (gSideStatuses[battlerDef] & SIDE_STATUS_LUCKY_CHANT || gStatuses3[battlerAtk] & STATUS3_CANT_SCORE_A_CRIT
+    if (gSideStatuses[GetBattlerSide(battlerDef)] & SIDE_STATUS_LUCKY_CHANT || gStatuses3[battlerAtk] & STATUS3_CANT_SCORE_A_CRIT
        || abilityDef == ABILITY_BATTLE_ARMOR || abilityDef == ABILITY_SHELL_ARMOR)
     {
         critChance = -1;
@@ -3428,6 +3428,10 @@ static void SetMoveEffectExt(bool32 primary, u32 certain, u8 trigger, u8 const* 
                         if (sTrappingMoves[gBattleCommunication[MULTISTRING_CHOOSER]] == gCurrentMove)
                             break;
                     }
+                    // not a listed trapping move (e.g. a called or Max move): generic message
+                    // instead of reading past the end of gWrappedStringIds
+                    if (gBattleCommunication[MULTISTRING_CHOOSER] >= NUM_TRAPPING_MOVES)
+                        gBattleCommunication[MULTISTRING_CHOOSER] = B_MSG_WRAPPED_WRAP;
                 }
                 break;
             case MOVE_EFFECT_ATK_PLUS_1:
@@ -16350,7 +16354,7 @@ static void TryUpdateRoundTurnOrder(void)
         }
 
         // update turn order for round users
-        for (i = 0; roundUsers[i] != 0xFF && i < 3; i++)
+        for (i = 0; i < 3 && roundUsers[i] != 0xFF; i++)
         {
             gBattlerByTurnOrder[currRounder] = roundUsers[i];
             gActionsByTurnOrder[currRounder] = gActionsByTurnOrder[roundUsers[i]];

@@ -149,6 +149,11 @@ static const char *sDumpList = NULL;
 static const char *sInputScript = NULL;
 // ROGUE_MONKEY=<seed>:<from frame>: random button presses; ROGUE_BATTLEFUZZ=<seed>
 static unsigned long sMonkeySeed, sMonkeyFrom, sBattleFuzz, sStateDumpFrame;
+// ROGUE_COVERAGE=<pass>:<first>:<last> (see src/pc_harness.c), from ROGUE_COVERAGE_FROM
+static const char *sCoverageSpec;
+static unsigned long sCoverageFrom = 3000;
+static u16 sCoverageKeys;
+extern u16 Harness_CoverageFrame(const char *spec, unsigned long frame, unsigned long fromFrame);
 extern void Harness_DumpState(void);
 extern void Harness_BattleFuzzFrame(unsigned long seed);
 extern void NullTrap_Init(void);
@@ -308,6 +313,12 @@ static void DumpFrame(unsigned long frame)
     fclose(f);
 }
 
+// test harness: screenshot of the current frame (e.g. when a test hangs)
+void Platform_DumpFrameNow(void)
+{
+    DumpFrame(sFrameCount);
+}
+
 #ifdef __vita__
 // The Vita has no environment; read KEY=VALUE lines from DATA_DIR/harness.txt
 static char sHarnessFile[65536];
@@ -369,6 +380,9 @@ static void InitTestHarness(void)
         sBattleFuzz = strtoul(v, NULL, 10);
     if ((v = getenv("ROGUE_STATEDUMP")) != NULL)
         sStateDumpFrame = strtoul(v, NULL, 10);
+    sCoverageSpec = getenv("ROGUE_COVERAGE");
+    if ((v = getenv("ROGUE_COVERAGE_FROM")) != NULL)
+        sCoverageFrom = strtoul(v, NULL, 10);
 
     sHeadless = (v = getenv("ROGUE_HEADLESS")) != NULL && *v == '1';
     if ((v = getenv("ROGUE_MAXFRAMES")) != NULL)
@@ -420,6 +434,8 @@ static bool RunGameFrame(bool draw)
         Harness_BattleFuzzFrame(sBattleFuzz);
     if (sStateDumpFrame != 0 && sFrameCount == sStateDumpFrame)
         Harness_DumpState();
+    if (sCoverageSpec != NULL)
+        sCoverageKeys = Harness_CoverageFrame(sCoverageSpec, sFrameCount, sCoverageFrom);
     MainLoop();
     if (sPerfLog)
         t1 = NowMs();
@@ -1026,6 +1042,7 @@ u16 Platform_GetKeyInput(void)
     u16 scripted = (sInputScript != NULL) ? GetScriptedKeys(sFrameCount) : 0;
     if (sMonkeySeed != 0 && sFrameCount >= sMonkeyFrom)
         scripted |= MonkeyKeys();
+    scripted |= sCoverageKeys;
     u16 mapped = 0;
 
     if (!Frontend_MenuIsOpen())

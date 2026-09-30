@@ -2173,7 +2173,15 @@ static void Controller_ReturnMonToBall(u32 battler)
 static void Controller_FaintPlayerMon(u32 battler)
 {
     u32 spriteId = gBattlerSpriteIds[battler];
-    if (gSprites[spriteId].y + gSprites[spriteId].y2 > DISPLAY_HEIGHT)
+    // the sprite can already be gone (faint processed twice in a double
+    // battle): it then never slides below the screen and the battle froze.
+    // Controller_FaintOpponentMon has the same !inUse check.
+    if (!gSprites[spriteId].inUse)
+    {
+        SetHealthboxSpriteInvisible(gHealthboxSpriteIds[battler]);
+        BattleControllerComplete(battler);
+    }
+    else if (gSprites[spriteId].y + gSprites[spriteId].y2 > DISPLAY_HEIGHT)
     {
         BattleGfxSfxDummy2(GetMonData(&gPlayerParty[gBattlerPartyIndexes[battler]], MON_DATA_SPECIES));
         FreeOamMatrix(gSprites[spriteId].oam.matrixNum);
