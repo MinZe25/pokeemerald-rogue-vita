@@ -39,16 +39,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /home/runner/vitasdk
-          key: vitasdk-${{ runner.os }}-sdl2-v1
+          key: vitasdk-${{ runner.os }}-sdl2-v2
 
       - name: Install VitaSDK + SDL2
         if: steps.vitasdk-cache.outputs.cache-hit != 'true'
         run: |
           git clone --depth 1 https://github.com/vitasdk/vdpm /tmp/vdpm
-          cd /tmp/vdpm
-          ./bootstrap-vitasdk.sh
+          /tmp/vdpm/bootstrap-vitasdk.sh
           export PATH=$VITASDK/bin:$PATH
-          ./install-all.sh
+          # the SDK ships its own package manager; SDL2 is the only package the port needs
+          yes | vdpm install sdl2
 
       - name: Add VitaSDK to PATH
         run: echo "$VITASDK/bin" >> "$GITHUB_PATH"
