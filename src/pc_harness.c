@@ -413,6 +413,11 @@ static void CovStartCase(void)
         }
         pSpecies = sCovMegaSpecies[sCovCase];
         pItem = sCovMegaItem[sCovCase];
+        // mega evolution needs the Mega Ring in the bag (CanMegaEvolve), Z moves / Ultra Burst the Z-Power Ring
+        if (!CheckBagHasItem(ITEM_MEGA_RING, 1))
+            AddBagItem(ITEM_MEGA_RING, 1);
+        if (!CheckBagHasItem(ITEM_Z_POWER_RING, 1))
+            AddBagItem(ITEM_Z_POWER_RING, 1);
         eSpecies = FuzzSpecies();
         doubles = sCovCase % 3 == 0;
         snprintf(sCovTag, sizeof(sCovTag), "megas:%lu", (unsigned long)sCovCase);

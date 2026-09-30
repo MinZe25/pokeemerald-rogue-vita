@@ -425,7 +425,28 @@ static bool RunGameFrame(bool draw)
     if (sSaveStateFrame && sFrameCount == sSaveStateFrame) HandleFrontendRequest(FE_REQUEST_SAVE_STATE);
     if (sLoadStateFrame && sFrameCount == sLoadStateFrame) HandleFrontendRequest(FE_REQUEST_LOAD_STATE);
     if (sResetFrame && sFrameCount == sResetFrame) HandleFrontendRequest(FE_REQUEST_RESET);
-    if (sMenuFrameAt && sFrameCount == sMenuFrameAt) { Frontend_OpenMenu(sFrameImage); Frontend_DrawMenu(sMenuFrame); memcpy(sFrameImage, sMenuFrame, sizeof(sMenuFrame)); DumpFrame(sFrameCount); Frontend_UpdateMenu(0); Frontend_UpdateMenu(PHYS_CIRCLE); }
+    if (sMenuFrameAt && sFrameCount == sMenuFrameAt)
+    {
+        // ROGUE_MENUNAV: keys pressed in the menu before the screenshot
+        // (d = down, u = up, l/r = left/right, x = cross), e.g. "ddddddddx"
+        const char *nav = getenv("ROGUE_MENUNAV");
+        Frontend_OpenMenu(sFrameImage);
+        for (; nav != NULL && *nav; nav++)
+        {
+            uint32_t key = *nav == 'd' ? PHYS_DOWN : *nav == 'u' ? PHYS_UP : *nav == 'l' ? PHYS_LEFT
+                         : *nav == 'r' ? PHYS_RIGHT : *nav == 'x' ? PHYS_CROSS : 0;
+            Frontend_UpdateMenu(0);
+            Frontend_UpdateMenu(key);
+        }
+        Frontend_DrawMenu(sMenuFrame);
+        memcpy(sFrameImage, sMenuFrame, sizeof(sMenuFrame));
+        DumpFrame(sFrameCount);
+        while (Frontend_MenuIsOpen())
+        {
+            Frontend_UpdateMenu(0);
+            Frontend_UpdateMenu(PHYS_CIRCLE);
+        }
+    }
     if (sSoundTestFrame != 0 && sFrameCount >= sSoundTestFrame)
         Harness_SoundTestFrame(sFrameCount - sSoundTestFrame);
     if (sFollowFrame != 0 && sFrameCount == sFollowFrame)
