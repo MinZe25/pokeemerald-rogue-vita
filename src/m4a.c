@@ -136,8 +136,23 @@ void m4aSoundMain(void)
 #endif
 }
 
+#ifdef PORTABLE
+#include "constants/songs.h"
+// Song numbers past the end of gSongTable (e.g. a battle animation script
+// reading its pan argument as the sound id) index garbage: on GBA the player
+// pointer read from there fails MPlayStart's ident check and nothing plays,
+// here the garbage pointer crashes. Ignore them, as the GBA effectively does.
+void PlatformLog(const char *fmt, ...);
+#define SONG_NUM_GUARD(n) do { if ((n) > END_MUS) { \
+        PlatformLog("ignored song %u (past END_MUS) from %p\n", (unsigned)(n), __builtin_return_address(0)); \
+        return; } } while (0)
+#else
+#define SONG_NUM_GUARD(n)
+#endif
+
 void m4aSongNumStart(u16 n)
 {
+    SONG_NUM_GUARD(n);
     const struct MusicPlayer *mplayTable = gMPlayTable;
     const struct Song *songTable = gSongTable;
     const struct Song *song = &songTable[n];
@@ -148,6 +163,7 @@ void m4aSongNumStart(u16 n)
 
 void m4aSongNumStartOrChange(u16 n)
 {
+    SONG_NUM_GUARD(n);
     const struct MusicPlayer *mplayTable = gMPlayTable;
     const struct Song *songTable = gSongTable;
     const struct Song *song = &songTable[n];
@@ -169,6 +185,7 @@ void m4aSongNumStartOrChange(u16 n)
 
 void m4aSongNumStartOrContinue(u16 n)
 {
+    SONG_NUM_GUARD(n);
     const struct MusicPlayer *mplayTable = gMPlayTable;
     const struct Song *songTable = gSongTable;
     const struct Song *song = &songTable[n];
@@ -184,6 +201,7 @@ void m4aSongNumStartOrContinue(u16 n)
 
 void m4aSongNumStop(u16 n)
 {
+    SONG_NUM_GUARD(n);
     const struct MusicPlayer *mplayTable = gMPlayTable;
     const struct Song *songTable = gSongTable;
     const struct Song *song = &songTable[n];
@@ -195,6 +213,7 @@ void m4aSongNumStop(u16 n)
 
 void m4aSongNumContinue(u16 n)
 {
+    SONG_NUM_GUARD(n);
     const struct MusicPlayer *mplayTable = gMPlayTable;
     const struct Song *songTable = gSongTable;
     const struct Song *song = &songTable[n];
