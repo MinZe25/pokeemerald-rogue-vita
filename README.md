@@ -10,12 +10,46 @@ The port contains no game data. Its graphics, sounds and maps are loaded at star
 
 1. Download `pokeemerald_rogue.vpk` from the [Releases](../../releases) page.
 2. Copy it to the Vita and install it with **VitaShell**. The app is *Pokémon Emerald Rogue*, title ID `PKMR00001`.
-3. Copy your Emerald Rogue EX v2.2.1 `.gba` into `ux0:data/pokeemerald_rogue/`. Any file name works. If the ROM is missing or a different version, the game shows a screen saying so.
+3. Copy your Emerald Rogue EX v2.2.1 `.gba` into `ux0:data/pokeemerald_rogue/` (see [The ROM](#the-rom) below). If the ROM is missing or a different version, the game shows a screen saying so.
 4. Saves, settings and save states are stored in the same folder. Updating over an existing install keeps them.
 
 > If the bubble or LiveArea art doesn't change after an update, delete the app from the home screen and install the vpk again. Your data in `ux0:data` is kept.
 
 **Bringing an emulator save:** the save format matches the GBA's, so a Rogue save from an emulator (`.sav` / `.srm`, 128 KB) can be copied to `ux0:data/pokeemerald_rogue/pokeemerald.sav`.
+
+## The ROM
+
+The vpk contains code only. Graphics, music, sounds and maps come from your ROM, so you need exactly this one:
+
+| | |
+|---|---|
+| Game | Pokémon Emerald Rogue **EX** (not the Vanilla variant) |
+| Version | **2.2.1**, Pokabbie's official release |
+| Size | 32 MB (33,554,432 bytes) |
+| SHA-1 | `7600af1fe08444c850c3c1227fd7dfd81336ae8e` |
+
+Other versions don't work, older or newer, nor Vanilla or other hacks: the port reads every asset from a fixed position in that exact file.
+
+**Making the ROM:**
+1. Dump your own Pokémon Emerald cartridge to a `.gba` file.
+2. Get the official **EX v2.2.1** patch from Pokabbie's Emerald Rogue release channels.
+3. Apply the patch to your Emerald ROM with a patcher such as [Rom Patcher JS](https://www.marcrobledo.com/RomPatcher.js/). If the patcher reports a wrong source ROM, your Emerald dump is not the version the patch expects.
+4. Check the SHA-1 of the result:
+   - Windows (PowerShell): `Get-FileHash -Algorithm SHA1 "Emerald Rogue.gba"`
+   - Linux / macOS: `sha1sum "Emerald Rogue.gba"` (macOS: `shasum`)
+
+   It must be `7600af1fe08444c850c3c1227fd7dfd81336ae8e`. If you already play Emerald Rogue 2.2.1 EX on an emulator, check that ROM first: it is probably the right one.
+
+**Installing it:** copy the `.gba` into `ux0:data/pokeemerald_rogue/` (for example with VitaShell's FTP or USB mode).
+- Any file name works, but it must end in lowercase `.gba`.
+- Other `.gba` files in the folder are ignored, as long as one of them is the right ROM.
+- The ROM is read once at startup to copy the assets into memory, then released. It is never changed, and the game does not need it again until the next launch.
+
+**If it doesn't start:**
+- *"no ROM found"*: no `.gba` in `ux0:data/pokeemerald_rogue/`. Check the folder name and the extension (`.GBA` or `.gba.zip` won't be found).
+- *"wrong ROM version"*: a `.gba` was found but it isn't EX v2.2.1. Check its SHA-1 as above. `ux0:data/pokeemerald_rogue/log.txt` lists every file that was checked.
+
+Please don't share ROMs or ask for them: that's why the port loads its data from your own.
 
 ## Controls
 
@@ -99,6 +133,8 @@ make PORTABLE=1 TARGET_OS=VITA RELEASE=1      # pokeemerald_rogue.vpk (needs Vit
 make PORTABLE=1 TARGET_OS=LINUX RELEASE=1     # pokeemerald_rogue (32-bit, needs libsdl2-dev:i386)
 make PORTABLE=1 TARGET_OS=WINDOWS RELEASE=1   # pokeemerald_rogue.exe (i686-w64-mingw32 + SDL2 in ./SDL2)
 ```
+
+The Vita build always loads its assets from the ROM. PC builds embed them by default; with `ROM_ASSETS=1` the Linux build also loads them from the ROM, looking for the `.gba` in its working directory.
 
 The **Vita release** GitHub Action (`.github/workflows/vita-release.yml`) builds the vpk and publishes a release. To trigger it, push a tag named `vita-v*`, or run it from the Actions tab.
 
