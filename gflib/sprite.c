@@ -277,7 +277,14 @@ static u16 sSpritePaletteTags[16];
 u32 gOamMatrixAllocBitmap;
 u8 gReservedSpritePaletteCount;
 
+#ifdef PORTABLE
+// Battle anims index gSprites with SPRITE_NONE (0xFF) when a battler's sprite
+// is missing (e.g. a target that is off screen). On GBA that reads and writes
+// whatever RAM follows the array; here it lands in spare, never used entries.
+EWRAM_DATA struct Sprite gSprites[SPRITE_NONE + 1] = {0};
+#else
 EWRAM_DATA struct Sprite gSprites[MAX_SPRITES + 1] = {0};
+#endif
 EWRAM_DATA static u8 sSpriteOrder[MAX_SPRITES] = {0};
 EWRAM_DATA static bool8 sShouldProcessSpriteCopyRequests = 0;
 EWRAM_DATA static u8 sSpriteCopyRequestCount = 0;
@@ -1042,7 +1049,13 @@ void JumpToTopOfAnimLoop(struct Sprite *sprite)
     {
         sprite->animCmdIndex--;
 
+#ifdef PORTABLE
+        // same result, without reading the entry before the table when the
+        // loop has no start marker
+        while (sprite->animCmdIndex != 0 && sprite->anims[sprite->animNum][sprite->animCmdIndex - 1].type != -3)
+#else
         while (sprite->anims[sprite->animNum][sprite->animCmdIndex - 1].type != -3)
+#endif
         {
             if (sprite->animCmdIndex == 0)
                 break;
@@ -1134,7 +1147,12 @@ void JumpToTopOfAffineAnimLoop(u8 matrixNum, struct Sprite *sprite)
     {
         sAffineAnimStates[matrixNum].animCmdIndex--;
 
+#ifdef PORTABLE
+        while (sAffineAnimStates[matrixNum].animCmdIndex != 0
+            && sprite->affineAnims[sAffineAnimStates[matrixNum].animNum][sAffineAnimStates[matrixNum].animCmdIndex - 1].type != 32765)
+#else
         while (sprite->affineAnims[sAffineAnimStates[matrixNum].animNum][sAffineAnimStates[matrixNum].animCmdIndex - 1].type != 32765)
+#endif
         {
             if (sAffineAnimStates[matrixNum].animCmdIndex == 0)
                 break;

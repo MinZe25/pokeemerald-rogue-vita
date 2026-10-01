@@ -4829,7 +4829,6 @@ ShadowForceAttack:
 	call ShadowForceBg
 	waitbgfadein
 	delay 10
-	playsewithpan SOUND_PAN_ATTACKER, 192
 	createvisualtask AnimTask_NightShadeClone, 5, 85
 	delay 70
 	createvisualtask AnimTask_ShakeMon2, 2, ANIM_TARGET, 2, 0, 12, 1
@@ -8623,7 +8622,6 @@ PhantomForceAttack:
 	createvisualtask AnimTask_BlendColorCycle, 2, F_PAL_TARGET, 0, 2, 0, 13, RGB_PURPLE
 	waitforvisualfinish
 	delay 1
-	playsewithpan SOUND_PAN_ATTACKER, 192
 	createvisualtask AnimTask_NightShadeClone, 5, 10
 	waitforvisualfinish
 	clearmonbg ANIM_ATTACKER

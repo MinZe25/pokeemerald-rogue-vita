@@ -234,6 +234,7 @@ void Harness_SoundTestFrame(unsigned long t)
 #include "battle.h"
 #include "battle_anim.h"
 #include "battle_controllers.h"
+#include "battle_gfx_sfx_util.h"
 #include "battle_main.h"
 #include "sprite.h"
 #include "task.h"
@@ -249,9 +250,18 @@ void NullTrap_Note(const char *line);
 void exit(int status); // <stdlib.h> clashes with the game's macros
 void Platform_DumpFrameNow(void);
 
-enum { COV_NONE, COV_MOVES, COV_ABILITIES, COV_MEGAS };
+enum { COV_NONE, COV_MOVES, COV_ABILITIES, COV_MEGAS, COV_ANIMS };
+// anims pass: every general / special / status animation (tables in
+// data/battle_anim_scripts.s), played by the player or the opponent, in
+// singles and doubles
+#define COV_ANIMS_GENERAL 51
+#define COV_ANIMS_SPECIAL 8
+#define COV_ANIMS_STATUS  10
+#define COV_ANIM_IDS      (COV_ANIMS_GENERAL + COV_ANIMS_SPECIAL + COV_ANIMS_STATUS)
+static u8 sCovAnimType, sCovAnimId, sCovAnimEnemy, sCovAnimState;
 #define COV_ENV_VARIANTS 5
 #define COV_TURNS        3      // turns of move use before the battle is ended
+static unsigned long sCovAnimFrames; // frames with a battle anim script running
 #define COV_CASE_FRAMES  36000  // longer than this: hang
 
 static int sCovPass;
@@ -424,10 +434,50 @@ static void CovStartCase(void)
         snprintf(line, sizeof(line), "CASE %s species=%d item=%d vs %d doubles=%d moves=%d,%d,%d,%d\n",
                  sCovTag, pSpecies, pItem, eSpecies, doubles, m[0], m[1], m[2], m[3]);
         break;
+    case COV_ANIMS:
+    {
+        static const char *const sTypeNames[] = { [ANIM_TYPE_GENERAL] = "general", [ANIM_TYPE_SPECIAL] = "special", [ANIM_TYPE_STATUS] = "status" };
+        u32 id = sCovCase % COV_ANIM_IDS, variant = sCovCase / COV_ANIM_IDS;
+        if (id < COV_ANIMS_GENERAL)
+            sCovAnimType = ANIM_TYPE_GENERAL, sCovAnimId = id;
+        else if (id < COV_ANIMS_GENERAL + COV_ANIMS_SPECIAL)
+            sCovAnimType = ANIM_TYPE_SPECIAL, sCovAnimId = id - COV_ANIMS_GENERAL;
+        else
+            sCovAnimType = ANIM_TYPE_STATUS, sCovAnimId = id - COV_ANIMS_GENERAL - COV_ANIMS_SPECIAL;
+        if ((sCovAnimType == ANIM_TYPE_GENERAL && sCovAnimId == B_ANIM_POKEBLOCK_THROW)
+         || (sCovAnimType == ANIM_TYPE_SPECIAL && sCovAnimId == B_ANIM_BALL_THROW_WITH_TRAINER))
+        {
+            // Safari / Wally only: they wait for the throwing trainer's back sprite anim
+            snprintf(line, sizeof(line), "SKIP anims:%lu anim=%s:%d needs a Safari / Wally battle\n",
+                     (unsigned long)sCovCase, sTypeNames[sCovAnimType], sCovAnimId);
+            printf("%s", line);
+            NullTrap_Note(line);
+            sCovStarted = FALSE;
+            return;
+        }
+        sCovAnimEnemy = variant & 1;
+        sCovAnimState = 0;
+        doubles = (variant & 2) != 0;
+        pSpecies = FuzzSpecies();
+        eSpecies = FuzzSpecies();
+        snprintf(sCovTag, sizeof(sCovTag), "anims:%lu", (unsigned long)sCovCase);
+        snprintf(line, sizeof(line), "CASE %s anim=%s:%d by=%s doubles=%d species=%d/%d\n", sCovTag,
+                 sTypeNames[sCovAnimType], sCovAnimId, sCovAnimEnemy ? "opponent" : "player", doubles, pSpecies, eSpecies);
+        break;
+    }
     }
     printf("%s", line);
     fflush(stdout);
     NullTrap_Note(line);
+
+    // ROGUE_ANIMS=1: play the battle animations (Rogue forces them on in boss
+    // battles even when the options turn them off)
+    if (getenv("ROGUE_ANIMS") != NULL || sCovPass == COV_ANIMS)
+    {
+        gSaveBlock2Ptr->optionsWildBattleScene = OPTIONS_BATTLE_SCENE_4X;
+        gSaveBlock2Ptr->optionsTrainerBattleScene = OPTIONS_BATTLE_SCENE_4X;
+        gSaveBlock2Ptr->optionsBossBattleScene = OPTIONS_BATTLE_SCENE_4X;
+    }
 
     ZeroPlayerPartyMons();
     for (i = 0; i < (doubles ? 2 : 1); i++)
@@ -501,7 +551,7 @@ static u16 CovBattleKeys(void)
                 CovApplyEnvironment();
                 sCovEnvDone = TRUE;
             }
-            if (gBattleResults.battleTurnCounter >= COV_TURNS)
+            if (gBattleResults.battleTurnCounter >= COV_TURNS || (sCovPass == COV_ANIMS && sCovAnimState == 2))
                 gBattleOutcome = B_OUTCOME_RAN;
             // PP drained (Spite, Eerie Spell, 1 PP moves...): top up, or the
             // move menu refuses every move and the test never ends
@@ -563,14 +613,15 @@ u16 Harness_CoverageFrame(const char *spec, unsigned long frame, unsigned long f
         if (!strcmp(spec, "info")) // case counts for tools/pc/battle_coverage.sh
         {
             CovBuildMegaList();
-            printf("COVERAGE_INFO moves=%d abilities=%d megas=%d\n",
-                   (MOVES_COUNT - 1) * COV_ENV_VARIANTS, ABILITIES_COUNT - 1, sCovMegaCount);
+            printf("COVERAGE_INFO moves=%d abilities=%d megas=%d anims=%d\n",
+                   (MOVES_COUNT - 1) * COV_ENV_VARIANTS, ABILITIES_COUNT - 1, sCovMegaCount, COV_ANIM_IDS * 4);
             fflush(stdout);
             exit(0);
         }
         if (sscanf(spec, "%15[a-z]:%lu:%lu", pass, &first, &last) < 2)
             return 0;
-        sCovPass = !strcmp(pass, "moves") ? COV_MOVES : !strcmp(pass, "abilities") ? COV_ABILITIES : COV_MEGAS;
+        sCovPass = !strcmp(pass, "moves") ? COV_MOVES : !strcmp(pass, "abilities") ? COV_ABILITIES
+                 : !strcmp(pass, "anims") ? COV_ANIMS : COV_MEGAS;
         sCovCase = first;
         sCovLast = last ? last : first;
     }
@@ -611,12 +662,43 @@ u16 Harness_CoverageFrame(const char *spec, unsigned long frame, unsigned long f
     {
         sCovInBattle = TRUE;
         sCovIdle = 0;
+        if (gAnimScriptActive)
+            sCovAnimFrames++;
         if (getenv("ROGUE_COVDEBUG") && sCovCaseFrames % 300 == 0)
             printf("COVDEBUG f=%lu turn=%d state=%d/%d cursor=%d/%d mainFunc=%p outcome=%d curMove=%d attacker=%d\n",
                    (unsigned long)sCovCaseFrames, gBattleResults.battleTurnCounter,
                    Harness_PlayerControllerState(0), gBattlersCount > 2 ? Harness_PlayerControllerState(2) : -1,
                    gMoveSelectionCursor[0], gBattlersCount > 2 ? gMoveSelectionCursor[2] : -1,
                    (void *)gBattleMainFunc, gBattleOutcome, gCurrentMove, gBattlerAttacker);
+        if (sCovPass == COV_ANIMS && sCovAnimState == 0 && Harness_PlayerControllerState(0) == 1)
+        {
+            // at the first action menu: play the animation under test, the
+            // way the battle controllers launch them
+            u8 atk = GetBattlerAtPosition(sCovAnimEnemy ? B_POSITION_OPPONENT_LEFT : B_POSITION_PLAYER_LEFT);
+            u8 def = GetBattlerAtPosition(sCovAnimEnemy ? B_POSITION_PLAYER_LEFT : B_POSITION_OPPONENT_LEFT);
+            gBattlerAttacker = atk;
+            gBattlerTarget = def;
+            if (sCovAnimType == ANIM_TYPE_GENERAL)
+                TryHandleLaunchBattleTableAnimation(atk, atk, def, sCovAnimId, 0);
+            else if (sCovAnimType == ANIM_TYPE_SPECIAL)
+                InitAndLaunchSpecialAnimation(atk, atk, def, sCovAnimId);
+            else
+                LaunchStatusAnimation(atk, sCovAnimId);
+            sCovAnimState = 1;
+            return 0;
+        }
+        if (sCovPass == COV_ANIMS && sCovAnimState == 1)
+        {
+            if (!gAnimScriptActive) // the launch task runs the script
+            {
+                char line[64];
+                snprintf(line, sizeof(line), "ANIMDONE %s animframes=%lu\n", sCovTag, (unsigned long)sCovAnimFrames);
+                printf("%s", line);
+                NullTrap_Note(line);
+                sCovAnimState = 2;
+            }
+            return 0;
+        }
         if (sCovPhase & 1)
             return 0; // release between presses so JOY_NEW sees each one
         return CovBattleKeys();
@@ -629,8 +711,9 @@ u16 Harness_CoverageFrame(const char *spec, unsigned long frame, unsigned long f
         sCovIdle = 0;
         if (sCovStarted && sCovInBattle)
         {
-            char line[64];
-            snprintf(line, sizeof(line), "DONE %s frames=%lu\n", sCovTag, (unsigned long)sCovCaseFrames);
+            char line[96];
+            snprintf(line, sizeof(line), "DONE %s frames=%lu animframes=%lu\n", sCovTag,
+                     (unsigned long)sCovCaseFrames, (unsigned long)sCovAnimFrames);
             printf("%s", line);
             NullTrap_Note(line);
             sCovCase++;
@@ -648,6 +731,7 @@ u16 Harness_CoverageFrame(const char *spec, unsigned long frame, unsigned long f
         sCovStarted = TRUE;
         sCovInBattle = FALSE;
         sCovCaseFrames = 0;
+        sCovAnimFrames = 0;
         CovStartCase();
         if (!sCovStarted) // skipped case
             sCovCase++;

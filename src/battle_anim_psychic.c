@@ -1139,7 +1139,11 @@ static void AnimTask_ExtrasensoryDistortion_Step(u8 taskId)
         i = task->data[14];
         while (i <= task->data[15])
         {
+#ifdef PORTABLE
+            s16 var2 = (gSineTable[sineIndex & 0xFF] >> task->data[12]);
+#else
             s16 var2 = (gSineTable[sineIndex] >> task->data[12]);
+#endif
             if (var2 > 0)
                 var2 += (task->data[1] & 3);
             else if (var2 < 0)

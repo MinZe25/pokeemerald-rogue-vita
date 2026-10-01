@@ -514,12 +514,19 @@ const s16 gSineDegreeTable[] =
 // amplitude * sin(index*(π/128))
 s16 Sin(s16 index, s16 amplitude)
 {
+#ifdef PORTABLE
+    // some anims pass unmasked angles; past the table only garbage is read on GBA
+    index &= 0xFF;
+#endif
     return (amplitude * gSineTable[index]) >> 8;
 }
 
 // amplitude * cos(index*(π/128))
 s16 Cos(s16 index, s16 amplitude)
 {
+#ifdef PORTABLE
+    index &= 0xFF;
+#endif
     return (amplitude * gSineTable[index + 64]) >> 8;
 }
 

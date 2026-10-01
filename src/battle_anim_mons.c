@@ -841,6 +841,12 @@ bool8 IsBattlerSpritePresent(u8 battlerId)
     }
     else
     {
+#ifdef PORTABLE
+        // battler ids read from a missing sprite (SPRITE_NONE) are garbage: the
+        // party index read with them points anywhere
+        if (battlerId >= MAX_BATTLERS_COUNT)
+            return FALSE;
+#endif
         if (GetBattlerPosition(battlerId) == 0xff)
             return FALSE;
 

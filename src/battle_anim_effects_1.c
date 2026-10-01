@@ -521,6 +521,11 @@ const union AnimCmd *const gSolarBeamBigOrbAnimTable[] =
     gSolarBeamBigOrbAnimCmds5,
     gSolarBeamBigOrbAnimCmds6,
     gSolarBeamBigOrbAnimCmds7,
+#ifdef PORTABLE
+    // AnimHyperBeamOrb picks anim Random2() % 8: anim 7 reads past the table,
+    // which on GBA is the first entry of gSolarBeamSmallOrbAnimTable below.
+    gSolarBeamSmallOrbAnimCms,
+#endif
 };
 
 const union AnimCmd *const gSolarBeamSmallOrbAnimTable[] =

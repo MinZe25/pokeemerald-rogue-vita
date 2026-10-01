@@ -3,18 +3,21 @@
 #
 # Plays one short, deterministic wild battle per case (see ROGUE_COVERAGE in
 # src/pc_harness.c): every move (x5 terrain/weather variants), every ability,
-# every mega / primal / ultra burst. Logs every NULL access, crash, division by
+# every mega / primal / ultra burst, every general / special / status battle
+# animation (anims). Logs every NULL access, crash, division by
 # zero and hang (src/platform/nulltrap.c), plus AddressSanitizer errors with an
 # ASAN=1 build, and writes one de-duplicated report.
 #
 # usage: tools/pc/battle_coverage.sh <save file> [passes] [jobs]
 #   save file: a save standing in the overworld (the hub), e.g. a Vita save
-#   passes:    comma list of moves,abilities,megas (default: all)
+#   passes:    comma list of moves,abilities,megas,anims (default: all)
 #   jobs:      parallel games (default: number of CPUs)
 # env:
 #   GAME=pokeemerald_rogue_asan  use the AddressSanitizer build (make ... ASAN=1)
 #   OUT=dir                      output directory (default: coverage_out)
 #   RANGE=first:last             only these case ids (single pass)
+#   ANIMS=1                      play the battle animations (off in most saves,
+#                                but always on in boss / gym battles)
 #
 # Build first:  make PORTABLE=1 TARGET_OS=LINUX RELEASE=1 [ASAN=1]
 # NULL trap:    sudo sysctl -w vm.mmap_min_addr=0   (resets on reboot)
@@ -24,7 +27,7 @@
 set -u
 cd "$(dirname "$0")/../.."
 SAVE=${1:?usage: $0 <save file> [passes] [jobs]}
-PASSES=${2:-moves,abilities,megas}
+PASSES=${2:-moves,abilities,megas,anims}
 JOBS=${3:-$(nproc)}
 GAME=${GAME:-pokeemerald_rogue}
 OUT=${OUT:-coverage_out}
@@ -45,6 +48,7 @@ info=$(cd "$OUT" && ROGUE_HEADLESS=1 ROGUE_COVERAGE=info ./game 2>/dev/null | gr
 [ -n "$info" ] || { echo "the game did not report its case counts"; exit 1; }
 echo "$info"
 
+[ -n "${ANIMS:-}" ] && export ROGUE_ANIMS=1
 export ASAN_OPTIONS="halt_on_error=0:handle_segv=0:allow_user_segv_handler=1:detect_leaks=0:symbolize=0"
 
 # runs cases first..last of a pass; restarts after crashes / hangs
