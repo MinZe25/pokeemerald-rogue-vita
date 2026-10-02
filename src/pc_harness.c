@@ -840,6 +840,12 @@ u16 Harness_ScoutFrame(const char *spec, unsigned long frame)
     case 0: // in the overworld: go to the path screen (starts a run from the hub)
         if (!ScoutOverworldIdle())
             break;
+        {
+            static bool8 sStartPrinted;
+            if (!sStartPrinted) // the run's seed only means something if the save was made during it
+                printf("SCOUT_START inRun=%d seed=%u\n", Rogue_IsRunActive(), gRogueRun.baseSeed);
+            sStartPrinted = TRUE;
+        }
         if (Rogue_IsRunActive() && gRogueAdvPath.isOverviewActive)
         {
             sPhase = 2;

@@ -34,6 +34,7 @@ def map_name(group, num):
 
 names, types, levels, pools, routes = {}, {}, {}, {}, {}
 evos = {}  # target species -> [[from, how], ...]
+run = {'inRun': False, 'seed': 0}
 
 # EVO_* method names from the game's constants
 methods = {}
@@ -58,6 +59,9 @@ for d in range(14):
             sp = int(parts[1])
             names[sp] = parts[4]
             types[sp] = sorted({int(parts[2]), int(parts[3])})
+        elif line.startswith('SCOUT_START ') and d == 0:
+            m = re.match(r'SCOUT_START inRun=(\d) seed=(\d+)', line)
+            run = {'inRun': m.group(1) == '1', 'seed': int(m.group(2))}
         elif line.startswith('EVO ') and d == 0:
             parts = line.rstrip('\n').split(' ', 5)
             src, dst, method, param = (int(x) for x in parts[1:5])
@@ -81,15 +85,6 @@ for r in routes:
     routes[r]['ok'] = ok
     if not ok:
         print('route %d (%s): entering it failed, see %s' % (r, routes[r]['map'], log))
-    frames = sorted(glob.glob(os.path.join(d, 'frame_*.bmp')))
-    if frames:
-        try:
-            from PIL import Image
-            buf = io.BytesIO()
-            Image.open(frames[-1]).convert('RGB').save(buf, 'PNG', optimize=True)
-            routes[r]['img'] = base64.b64encode(buf.getvalue()).decode()
-        except ImportError:
-            pass
 
 # the path screen's route icons: one sprite per type hint, facing down (Calm),
 # up (Average) or left (Tough) (SelectObjectMovementTypeForRoom)
@@ -111,7 +106,7 @@ try:
 except ImportError:
     pass
 
-data = {'names': names, 'icons': icons, 'evos': evos, 'types': types, 'typeNames': TYPES, 'adjectives': adjectives,
+data = {'names': names, 'icons': icons, 'evos': evos, 'run': run, 'types': types, 'typeNames': TYPES, 'adjectives': adjectives,
         'levels': levels, 'pools': pools, 'routes': routes}
 page = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'encounters_template.html'), encoding='utf-8').read()
 open(out, 'w', encoding='utf-8').write(page.replace('/*DATA*/null', json.dumps(data, separators=(',', ':'))))
