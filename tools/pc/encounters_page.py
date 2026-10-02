@@ -33,6 +33,20 @@ def map_name(group, num):
     return re.sub(r'^Rogue_Route_', '', name).replace('_', ' ')
 
 names, types, levels, pools, routes = {}, {}, {}, {}, {}
+evos = {}  # target species -> [[from, how], ...]
+
+# EVO_* method names from the game's constants
+methods = {}
+for name, value in re.findall(r'#define (EVO_\w+)\s+(\d+)', open(os.path.join(root, 'include', 'constants', 'pokemon.h')).read()):
+    methods[int(value)] = name
+def describe(method, param, item):
+    m = methods.get(method, '')
+    if item:
+        return item
+    if m.startswith('EVO_LEVEL') or m == 'EVO_MOVE_TYPE':
+        return 'level %d' % (30 if m in ('EVO_MOVE_TYPE', 'EVO_LEVEL_30_NATURE') else param)
+    return m.replace('EVO_', '').replace('_', ' ').lower() or 'method %d' % method
+
 for d in range(14):
     log = os.path.join(work, 'pool_%d' % d, 'log.txt')
     if not os.path.exists(log):
@@ -44,6 +58,12 @@ for d in range(14):
             sp = int(parts[1])
             names[sp] = parts[4]
             types[sp] = sorted({int(parts[2]), int(parts[3])})
+        elif line.startswith('EVO ') and d == 0:
+            parts = line.rstrip('\n').split(' ', 5)
+            src, dst, method, param = (int(x) for x in parts[1:5])
+            how = describe(method, param, parts[5] if len(parts) > 5 else '')
+            if [src, how] not in evos.setdefault(dst, []):
+                evos[dst].append([src, how])
         elif line.startswith('POOL '):
             m = re.match(r'POOL route=(\d+) map=(\d+)\.(\d+) layout=\d+ level=(\d+) types=([\d,]+) name=\S* species=(.*)', line)
             r = int(m.group(1))
@@ -91,7 +111,7 @@ try:
 except ImportError:
     pass
 
-data = {'names': names, 'icons': icons, 'types': types, 'typeNames': TYPES, 'adjectives': adjectives,
+data = {'names': names, 'icons': icons, 'evos': evos, 'types': types, 'typeNames': TYPES, 'adjectives': adjectives,
         'levels': levels, 'pools': pools, 'routes': routes}
 page = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'encounters_template.html'), encoding='utf-8').read()
 open(out, 'w', encoding='utf-8').write(page.replace('/*DATA*/null', json.dumps(data, separators=(',', ':'))))

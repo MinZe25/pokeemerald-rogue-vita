@@ -99,7 +99,7 @@ Object.keys(DATA.pools).map(Number).sort((a, b) => a - b).forEach(d => {
 const inAnyPool = new Set();
 Object.values(DATA.pools).forEach(p => Object.values(p).forEach(l => l.forEach(e => inAnyPool.add(e[0]))));
 const list = document.getElementById('species');
-[...inAnyPool].map(sp => DATA.names[sp]).sort().forEach(n => {
+[...new Set([...inAnyPool, ...Object.keys(DATA.evos).map(Number)].map(sp => DATA.names[sp]))].sort().forEach(n => {
   const o = document.createElement('option'); o.value = n; list.appendChild(o);
 });
 document.getElementById('sub').textContent =
@@ -108,8 +108,10 @@ document.getElementById('sub').textContent =
 function findSpecies(q) {
   q = q.trim().toLowerCase();
   if (!q) return null;
-  const ids = [...inAnyPool].filter(sp => (DATA.names[sp] || '').toLowerCase() === q);
-  return ids.length ? ids : [...inAnyPool].filter(sp => (DATA.names[sp] || '').toLowerCase().startsWith(q));
+  // wild ones first, then the rest (e.g. Umbreon, which only comes from evolving)
+  const all = [...inAnyPool, ...Object.keys(DATA.names).map(Number).filter(sp => !inAnyPool.has(sp) && DATA.evos[sp])];
+  const ids = all.filter(sp => (DATA.names[sp] || '').toLowerCase() === q);
+  return ids.length ? ids.slice(0, 1) : all.filter(sp => (DATA.names[sp] || '').toLowerCase().startsWith(q));
 }
 
 function routeCard(r, pool, sp) {
@@ -135,6 +137,26 @@ function routeCard(r, pool, sp) {
   return { el, avg: best };
 }
 
+// gyms at which a species is in some route's wild pool
+const wildGyms = sp => Object.keys(DATA.pools).map(Number)
+  .filter(g => Object.values(DATA.pools[g]).some(l => l.some(e => e[0] === sp)));
+function gymRange(gyms) {
+  if (!gyms.length) return 'never wild';
+  const lo = gyms[0], hi = gyms[gyms.length - 1];
+  return lo === hi ? gymLabel(lo) : `${gymLabel(lo)} – ${gymLabel(hi)}`;
+}
+// how to get a species: the evolution chain back to something wild
+function origins(sp, depth = 0) {
+  const lines = [];
+  (DATA.evos[sp] || []).forEach(([from, how]) => {
+    const g = wildGyms(from);
+    lines.push(`${'&nbsp;'.repeat(depth * 4)}Evolves from <a href="#" data-sp="${from}">${DATA.names[from]}</a> with <b>${how}</b>` +
+               ` · ${DATA.names[from]}: ${g.length ? 'wild at ' + gymRange(g) : 'not wild'}`);
+    if (!g.length && depth < 2) lines.push(...origins(from, depth + 1));
+  });
+  return lines;
+}
+
 function render() {
   const out = document.getElementById('out');
   const d = gymSel.value, pools = DATA.pools[d] || {};
@@ -157,15 +179,23 @@ function render() {
                      .map(Number).map(gymLabel);
     h.textContent = `${DATA.names[sp]} at ${gymLabel(+d)}: ${cards.length ? cards.length + ' route(s)' : 'not wild here'}`;
     out.appendChild(h);
-    if (!cards.length) {
-      const p = document.createElement('div'); p.className = 'empty';
-      p.textContent = at.length ? `Found at: ${at.join(', ')}` : 'Not a wild Pokémon with these settings.';
-      out.appendChild(p);
-    }
+    const info = document.createElement('div');
+    info.className = 'legend';
+    info.innerHTML = [`Wild: ${gymRange(wildGyms(sp))}`, ...origins(sp)].join('<br>');
+    out.appendChild(info);
     cards.forEach(c => out.appendChild(c.el));
   });
 }
 document.getElementById('q').addEventListener('input', render);
+document.getElementById('out').addEventListener('click', e => {
+  const a = e.target.closest('a[data-sp]');
+  if (!a) return;
+  e.preventDefault();
+  const sp = +a.dataset.sp, g = wildGyms(sp);
+  document.getElementById('q').value = DATA.names[sp];
+  if (g.length && !g.includes(+gymSel.value)) gymSel.value = g[0];
+  render();
+});
 gymSel.addEventListener('change', render);
 render();
 </script>

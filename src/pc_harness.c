@@ -775,6 +775,7 @@ u16 Harness_CoverageFrame(const char *spec, unsigned long frame, unsigned long f
 #include "battle_main.h"
 #include "field_screen_effect.h"
 #include "rogue_pokedex.h"
+#include "rogue_baked.h"
 #include "constants/map_groups.h"
 void Harness_EnterAdvPathRoom(u8 roomIdx);
 void Harness_PrintRoutePools(void);
@@ -873,6 +874,26 @@ u16 Harness_ScoutFrame(const char *spec, unsigned long frame)
                 GameToAscii(GetSpeciesName(species), name, sizeof(name));
                 printf("NAME %d %d %d %s\n", species, RoguePokedex_GetSpeciesType(species, 0),
                        RoguePokedex_GetSpeciesType(species, 1), name);
+            }
+            // evolutions as Rogue changes them (e.g. Eevee -> Umbreon with a Moon Stone)
+            for (species = 1; species < NUM_SPECIES; species++)
+            {
+                int i, count = Rogue_GetMaxEvolutionCount(species);
+                for (i = 0; i < count; i++)
+                {
+                    struct Evolution evo;
+                    u8 item[ITEM_NAME_LENGTH + 1];
+                    char itemAscii[32] = "";
+                    Rogue_ModifyEvolution(species, i, &evo);
+                    if (evo.method == 0 || evo.targetSpecies == SPECIES_NONE || evo.method == EVOLUTIONS_END)
+                        continue;
+                    if (evo.method == EVO_ITEM || evo.method == EVO_ITEM_MALE || evo.method == EVO_ITEM_FEMALE)
+                    {
+                        CopyItemName(evo.param, item);
+                        GameToAscii(item, itemAscii, sizeof(itemAscii));
+                    }
+                    printf("EVO %d %d %d %d %s\n", species, evo.targetSpecies, evo.method, evo.param, itemAscii);
+                }
             }
             fflush(stdout);
             exit(0);
