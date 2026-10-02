@@ -126,6 +126,11 @@ void Harness_BattleFuzzFrame(unsigned long seed)
 #include "field_player_avatar.h"
 #include "berry.h"
 #include "rogue_controller.h"
+#include "rogue_settings.h"
+#include "rogue.h"
+#include "rogue_adventurepaths.h"
+#include "event_data.h"
+#include "constants/flags.h"
 
 extern const u8 BerryTreeScript[];
 bool8 Rogue_IsRunActive(void);
@@ -140,6 +145,19 @@ void Harness_DumpState(void)
     printf("STATE run=%d map=%d.%d player=(%d,%d) elev=%d facing=%d BerryTreeScript=%p\n",
            Rogue_IsRunActive(), gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum,
            x, y, gObjectEvents[gPlayerAvatar.objectEventId].currentElevation, GetPlayerFacingDirection(), (const void *)BerryTreeScript);
+    printf("MODE config=%d runGenerator=%d difficulty=%d roomId=%d baseSeed=%u\n",
+           Rogue_GetConfigRange(CONFIG_RANGE_GAME_MODE_NUM), gRogueRun.gameRules.adventureGenerator,
+           Rogue_GetCurrentDifficulty(), gRogueRun.adventureRoomId, gRogueRun.baseSeed);
+    for (i = 0; i < ROGUE_ADVENTURE_REPLAY_COUNT; i++)
+        printf("REPLAY %d valid=%d seed=%u mode=%d\n", i, gRogueSaveBlock->adventureReplay[i].isValid,
+               gRogueSaveBlock->adventureReplay[i].baseSeed,
+               gRogueSaveBlock->adventureReplay[i].difficultyConfig.rangeValues[CONFIG_RANGE_GAME_MODE_NUM]);
+    printf("REPLAY active=%d\n", FlagGet(FLAG_ROGUE_ADVENTURE_REPLAY_ACTIVE));
+    printf("PATH length=%d rooms=%d y=%d..%d:", gRogueAdvPath.pathLength, gRogueAdvPath.roomCount,
+           gRogueAdvPath.pathMinY, gRogueAdvPath.pathMaxY);
+    for (i = 0; i < gRogueAdvPath.roomCount; i++)
+        printf(" (%d,%d)t%d", gRogueAdvPath.rooms[i].coords.x, gRogueAdvPath.rooms[i].coords.y, gRogueAdvPath.rooms[i].roomType);
+    printf("\n");
     for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
     {
         struct ObjectEvent *obj = &gObjectEvents[i];
@@ -744,5 +762,168 @@ u16 Harness_CoverageFrame(const char *spec, unsigned long frame, unsigned long f
         return 0;
     keys = (sCovPhase & 6) == 0 ? B_BUTTON : 0;
     return keys;
+}
+#endif
+
+#ifdef PORTABLE
+// ROGUE_SCOUT=<spec>: shows what a run's path holds without playing it
+//   info      print the rooms of the current path (starts a run from the hub)
+//   room:I    enter room I of the path and print its map and wild Pokémon
+//   route:K   enter the first route room, forced to route map K (crash tests)
+//   pools     print every route's wild pool (tools/pc/encounters.py)
+// ROGUE_SCOUT_DIFF=d regenerates the path at difficulty d (badges) first.
+#include "battle_main.h"
+#include "field_screen_effect.h"
+#include "rogue_pokedex.h"
+#include "constants/map_groups.h"
+void Harness_EnterAdvPathRoom(u8 roomIdx);
+void Harness_PrintRoutePools(void);
+void DoWarp(void);
+unsigned long strtoul(const char *s, char **end, int base); // <stdlib.h> clashes with the game's macros
+
+static void ScoutPrintSpecies(const char *label, const u16 *species, int count)
+{
+    char name[32];
+    int i;
+    printf("  %s:", label);
+    for (i = 0; i < count; i++)
+    {
+        if (species[i] == SPECIES_NONE)
+            continue;
+        GameToAscii(GetSpeciesName(species[i]), name, sizeof(name));
+        printf(" %s(%d)", name, species[i]);
+    }
+    printf("\n");
+}
+
+static void ScoutPrintPath(void)
+{
+    char type[16];
+    int i;
+    printf("SCOUT_PATH difficulty=%d seed=%u rooms=%d\n", Rogue_GetCurrentDifficulty(), gRogueRun.baseSeed, gRogueAdvPath.roomCount);
+    for (i = 0; i < gRogueAdvPath.roomCount; i++)
+    {
+        struct RogueAdvPathRoom *room = &gRogueAdvPath.rooms[i];
+        printf("  room %2d at (%d,%d) type=%d", i, room->coords.x, room->coords.y, room->roomType);
+        if (room->roomType == ADVPATH_ROOM_ROUTE)
+        {
+            GameToAscii(gTypeNames[Rogue_GetTypeForHintForRoom(room)], type, sizeof(type));
+            printf(" route=%d map=%d.%d difficulty=%d hint=%s", room->roomParams.roomIdx,
+                   gRogueRouteTable.routes[room->roomParams.roomIdx].map.group, gRogueRouteTable.routes[room->roomParams.roomIdx].map.num,
+                   room->roomParams.perType.route.difficulty, type);
+        }
+        printf("\n");
+    }
+    fflush(stdout);
+}
+
+static bool8 ScoutOverworldIdle(void)
+{
+    return gMain.callback2 == CB2_Overworld && !ArePlayerFieldControlsLocked() && !ScriptContext_IsEnabled();
+}
+
+u16 Harness_ScoutFrame(const char *spec, unsigned long frame)
+{
+    static int sPhase, sRoom = -1;
+    static unsigned long sWait;
+    static u32 sFrames;
+    const char *diff = getenv("ROGUE_SCOUT_DIFF");
+
+    if (++sFrames > 30000)
+    {
+        printf("SCOUT_FAIL stuck in phase %d\n", sPhase);
+        exit(4);
+    }
+    switch (sPhase)
+    {
+    case 0: // in the overworld: go to the path screen (starts a run from the hub)
+        if (!ScoutOverworldIdle())
+            break;
+        if (Rogue_IsRunActive() && gRogueAdvPath.isOverviewActive)
+        {
+            sPhase = 2;
+            break;
+        }
+        SetWarpDestination(MAP_GROUP(ROGUE_ADVENTURE_PATHS), MAP_NUM(ROGUE_ADVENTURE_PATHS), WARP_ID_NONE, 0, 0);
+        DoWarp();
+        sPhase = 1;
+        break;
+    case 1:
+        if (ScoutOverworldIdle() && Rogue_IsRunActive() && gRogueAdvPath.isOverviewActive)
+            sPhase = 2;
+        break;
+    case 2: // on the path screen
+        if (diff != NULL)
+        {
+            Rogue_SetCurrentDifficulty(strtoul(diff, NULL, 10));
+            gRogueAdvPath.roomCount = 0;
+            gRogueRun.adventureRoomId = ADVPATH_INVALID_ROOM_ID;
+            RogueAdv_GenerateAdventurePathsIfRequired();
+        }
+        ScoutPrintPath();
+        if (!strcmp(spec, "info"))
+            exit(0);
+        if (!strcmp(spec, "pools"))
+        {
+            int species;
+            char name[32];
+            Harness_PrintRoutePools();
+            for (species = 1; species < NUM_SPECIES; species++)
+            {
+                GameToAscii(GetSpeciesName(species), name, sizeof(name));
+                printf("NAME %d %d %d %s\n", species, RoguePokedex_GetSpeciesType(species, 0),
+                       RoguePokedex_GetSpeciesType(species, 1), name);
+            }
+            fflush(stdout);
+            exit(0);
+        }
+        if (!strncmp(spec, "room:", 5))
+        {
+            sRoom = strtoul(spec + 5, NULL, 10);
+        }
+        else if (!strncmp(spec, "route:", 6))
+        {
+            int i;
+            for (i = 0; i < gRogueAdvPath.roomCount && sRoom < 0; i++)
+                if (gRogueAdvPath.rooms[i].roomType == ADVPATH_ROOM_ROUTE)
+                    sRoom = i;
+            if (sRoom >= 0)
+                gRogueAdvPath.rooms[sRoom].roomParams.roomIdx = strtoul(spec + 6, NULL, 10);
+        }
+        if (sRoom < 0 || sRoom >= gRogueAdvPath.roomCount)
+        {
+            printf("SCOUT_FAIL no such room (%s)\n", spec);
+            exit(2);
+        }
+        printf("SCOUT_ENTER room %d\n", sRoom);
+        fflush(stdout);
+        Harness_EnterAdvPathRoom(sRoom);
+        sPhase = 3;
+        break;
+    case 3: // arrived: let the map scripts run, then report
+        if (!ScoutOverworldIdle() || gRogueAdvPath.isOverviewActive)
+        {
+            sWait = 0;
+            break;
+        }
+        if (++sWait < 120)
+            break;
+        {
+            struct RogueAdvPathRoom *room = &gRogueAdvPath.rooms[sRoom];
+            char type[16] = "-";
+            if (room->roomType == ADVPATH_ROOM_ROUTE)
+                GameToAscii(gTypeNames[Rogue_GetTypeForHintForRoom(room)], type, sizeof(type));
+            printf("SCOUT room=%d type=%d map=%d.%d route=%d difficulty=%d hint=%s\n", sRoom, room->roomType,
+                   gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum, room->roomParams.roomIdx,
+                   room->roomParams.perType.route.difficulty, type);
+            ScoutPrintSpecies("grass", gRogueRun.wildEncounters.species, WILD_ENCOUNTER_GRASS_CAPACITY);
+            ScoutPrintSpecies("water", gRogueRun.wildEncounters.species + WILD_ENCOUNTER_GRASS_CAPACITY, WILD_ENCOUNTER_WATER_CAPACITY);
+            fflush(stdout);
+            Platform_DumpFrameNow(); // what the map looks like
+            exit(0);
+        }
+    }
+    // dismiss messages / popups
+    return (frame % 20 == 0) ? B_BUTTON : 0;
 }
 #endif

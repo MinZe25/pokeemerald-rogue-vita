@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rogue Encounter Search</title>
+<style>
+:root {
+  --bg: #f6f6f3; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e2e2dc;
+  --accent: #2f6fd6; --good: #2e8b57; --warn: #c0392b; --bar: #dfe8f8;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #161615; --panel: #20201f; --text: #ececea; --muted: #9a9a94; --line: #33332f;
+          --accent: #7aa7f0; --good: #5cc28a; --warn: #f07a6a; --bar: #26324a; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, sans-serif; }
+main { max-width: 980px; margin: 0 auto; padding: 20px 16px 60px; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+.sub { color: var(--muted); margin: 0 0 18px; }
+.controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+input, select { font: inherit; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px;
+                background: var(--panel); color: var(--text); }
+input { flex: 1 1 260px; }
+.route { display: grid; grid-template-columns: 180px 1fr; gap: 14px; background: var(--panel);
+         border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+.route img { width: 180px; height: 120px; image-rendering: pixelated; border-radius: 6px; background: var(--line); }
+.noimg { width: 180px; height: 120px; border-radius: 6px; background: var(--line); }
+.name { font-weight: 600; font-size: 16px; }
+.meta { color: var(--muted); font-size: 13px; }
+.chance { font-size: 22px; font-weight: 700; color: var(--accent); float: right; }
+.hints { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+.hint { font-size: 13px; padding: 3px 8px; border-radius: 999px; background: var(--bar); }
+.hint b { font-weight: 600; }
+.pool { margin-top: 8px; font-size: 13px; color: var(--muted); }
+.pool span.me { color: var(--text); font-weight: 600; }
+.warn { color: var(--warn); font-size: 13px; }
+.empty { color: var(--muted); padding: 30px 0; text-align: center; }
+table.rooms { border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+table.rooms th { font-weight: 500; color: var(--muted); text-align: left; padding: 0 14px 2px 0; }
+table.rooms td { padding: 1px 14px 1px 0; white-space: nowrap; }
+table.rooms td.adj { font-weight: 600; }
+img.icon { width: 32px; height: 32px; image-rendering: pixelated; vertical-align: middle; margin-right: 4px; }
+table.rooms .top { color: var(--accent); font-weight: 700; }
+.legend { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+          margin-bottom: 16px; font-size: 13px; color: var(--muted); }
+details summary { cursor: pointer; color: var(--accent); font-size: 13px; margin-top: 6px; }
+@media (max-width: 560px) {
+  .route { grid-template-columns: 1fr; }
+  .route img, .noimg { width: 100%; height: auto; aspect-ratio: 3 / 2; }
+}
+</style>
+</head>
+<body>
+<main>
+  <h1>Encounter search</h1>
+  <p class="sub" id="sub"></p>
+  <div class="controls">
+    <input id="q" list="species" placeholder="Pokémon name, e.g. Eevee" autocomplete="off">
+    <datalist id="species"></datalist>
+    <select id="gym"></select>
+  </div>
+  <div class="legend">On the path screen a route's icon shows its type hint ("Typical" = Normal), and the way it
+    faces shows the difficulty: <b>Calm</b> faces you (5 wild Pokémon), <b>Average</b> faces away (3),
+    <b>Tough</b> faces left (2). The hint type always gets one of the slots. Percentages are the chance that
+    one room of that kind has the Pokémon; charms and curses that change the encounter count aren't counted.</div>
+  <div id="out"></div>
+</main>
+<script>
+const DATA = /*DATA*/null;
+const T = DATA.typeNames;
+const gymLabel = d => d < 8 ? `Gym ${d}` : d < 12 ? `Elite Four ${d - 7}` : d === 12 ? 'Champion' : 'Final champion';
+
+// A route room rolls 9 grass encounters but only uses the first few: Calm 5,
+// Average 3, Tough 2 (GetCurrentWildEncounterCount, before charms / curses).
+// Slot 1 is drawn from the pool's mons of the room's hint type, the others from
+// the rest of the pool, without repeats (RandomiseWildEncounters).
+const DIFFS = [['Calm', 5], ['Average', 3], ['Tough', 2]];
+function chance(pool, hint, sp, slots) {
+  const me = pool.find(e => e[0] === sp);
+  if (!me) return 0;
+  if (pool.length <= slots) return 1;
+  const w = me[1], S = pool.reduce((a, e) => a + e[1], 0);
+  const H = pool.filter(e => (DATA.types[e[0]] || []).includes(hint));
+  const SH = H.reduce((a, e) => a + e[1], 0);
+  const first = H.length ? (H.some(e => e[0] === sp) ? w / SH : 0) : w / S;
+  const rest = Math.min(1, (slots - 1) * w / (S - S / pool.length));
+  return first + (1 - first) * rest;
+}
+const icon = (h, d) => DATA.icons[h] ? `<img class="icon" alt="" src="data:image/png;base64,${DATA.icons[h][d]}">` : '';
+const pct = p => p >= 0.995 ? '100%' : p < 0.005 ? '<1%' : Math.round(p * 100) + '%';
+
+const gymSel = document.getElementById('gym');
+Object.keys(DATA.pools).map(Number).sort((a, b) => a - b).forEach(d => {
+  const o = document.createElement('option');
+  o.value = d; o.textContent = `${gymLabel(d)} (wild lv ${DATA.levels[d]})`;
+  gymSel.appendChild(o);
+});
+const inAnyPool = new Set();
+Object.values(DATA.pools).forEach(p => Object.values(p).forEach(l => l.forEach(e => inAnyPool.add(e[0]))));
+const list = document.getElementById('species');
+[...inAnyPool].map(sp => DATA.names[sp]).sort().forEach(n => {
+  const o = document.createElement('option'); o.value = n; list.appendChild(o);
+});
+document.getElementById('sub').textContent =
+  `${Object.keys(DATA.routes).length} routes · uses the dex and settings of your save · grass encounters`;
+
+function findSpecies(q) {
+  q = q.trim().toLowerCase();
+  if (!q) return null;
+  const ids = [...inAnyPool].filter(sp => (DATA.names[sp] || '').toLowerCase() === q);
+  return ids.length ? ids : [...inAnyPool].filter(sp => (DATA.names[sp] || '').toLowerCase().startsWith(q));
+}
+
+function routeCard(r, pool, sp) {
+  const route = DATA.routes[r];
+  const hints = [...new Set(route.types)];
+  const per = hints.map(h => ({ h, share: route.types.filter(t => t === h).length / route.types.length,
+                                p: DIFFS.map(([, n]) => sp == null ? 0 : chance(pool, h, sp, n)) }));
+  const best = Math.max(0, ...per.flatMap(x => x.p));
+  const el = document.createElement('div');
+  el.className = 'route';
+  el.innerHTML = (route.img ? `<img alt="" src="data:image/png;base64,${route.img}">` : '<div class="noimg"></div>') +
+    `<div>${sp != null ? `<span class="chance" title="best room on this route">${pct(best)}</span>` : ''}
+      <div class="name">${route.map}</div>
+      <div class="meta">Types ${hints.map(h => T[h]).join(' / ')} · ${pool.length} Pokémon in the pool</div>
+      ${route.ok ? '' : '<div class="warn">Entering this route failed in the test run</div>'}
+      <table class="rooms"><tr><th></th>${DIFFS.map(([d]) => `<th>${d}</th>`).join('')}</tr>
+        ${per.map(x => `<tr><td class="adj">${DATA.adjectives[x.h] || T[x.h]}</td>${x.p.map((p, d) =>
+          `<td>${icon(x.h, d)}${sp != null ? `<span class="${p >= best - 1e-9 && p > 0 ? 'top' : ''}">${pct(p)}</span>` : ''}</td>`).join('')}</tr>`).join('')}
+      </table>
+      <details><summary>All Pokémon here</summary><div class="pool">${pool.map(e =>
+        `<span class="${e[0] === sp ? 'me' : ''}">${DATA.names[e[0]] || e[0]}</span>`).join(', ')}</div></details>
+    </div>`;
+  return { el, avg: best };
+}
+
+function render() {
+  const out = document.getElementById('out');
+  const d = gymSel.value, pools = DATA.pools[d] || {};
+  const ids = findSpecies(document.getElementById('q').value);
+  out.innerHTML = '';
+  if (ids === null) {
+    Object.keys(pools).forEach(r => out.appendChild(routeCard(r, pools[r], null).el));
+    return;
+  }
+  if (!ids.length) {
+    out.innerHTML = '<div class="empty">No route has that Pokémon at any gym with these settings.</div>';
+    return;
+  }
+  ids.slice(0, 3).forEach(sp => {
+    const cards = Object.keys(pools).map(r => routeCard(r, pools[r], sp)).filter(c => c.avg > 0)
+                        .sort((a, b) => b.avg - a.avg);
+    const h = document.createElement('h2');
+    h.style.fontSize = '17px';
+    const at = Object.keys(DATA.pools).filter(g => Object.values(DATA.pools[g]).some(l => l.some(e => e[0] === sp)))
+                     .map(Number).map(gymLabel);
+    h.textContent = `${DATA.names[sp]} at ${gymLabel(+d)}: ${cards.length ? cards.length + ' route(s)' : 'not wild here'}`;
+    out.appendChild(h);
+    if (!cards.length) {
+      const p = document.createElement('div'); p.className = 'empty';
+      p.textContent = at.length ? `Found at: ${at.join(', ')}` : 'Not a wild Pokémon with these settings.';
+      out.appendChild(p);
+    }
+    cards.forEach(c => out.appendChild(c.el));
+  });
+}
+document.getElementById('q').addEventListener('input', render);
+gymSel.addEventListener('change', render);
+render();
+</script>
+</body>
+</html>

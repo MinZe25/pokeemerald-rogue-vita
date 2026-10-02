@@ -10424,3 +10424,65 @@ static void RandomiseBerryTrees(void)
     }
     RogueItemQuery_End();
 }
+#ifdef PORTABLE
+// PC harness (ROGUE_SCOUT=pools, tools/pc/encounters.py): every route's wild
+// pool for the current settings and difficulty, as RandomiseWildEncounters
+// builds it but without the random trimming of very large pools.
+#include "region_map.h"
+int printf(const char *fmt, ...);
+
+static bool8 Harness_PrintPoolSpecies(u16 species, void *data)
+{
+    u8 weight = RandomiseWildEncounters_CalculateWeight(0, species, NULL);
+    if (weight != 0)
+        printf(" %u:%u", species, weight);
+    return TRUE;
+}
+
+void Harness_PrintRoutePools(void)
+{
+    u8 r, i;
+    u8 savedType = gRogueAdvPath.currentRoomType;
+    u8 savedRoute = gRogueRun.currentRouteIndex;
+
+    for (r = 0; r < gRogueRouteTable.routeCount; ++r)
+    {
+        const struct RogueRouteEncounter *route = &gRogueRouteTable.routes[r];
+        const struct MapHeader *header = Overworld_GetMapHeaderByGroupAndId(route->map.group, route->map.num);
+        u8 name[32];
+        u32 typeFlags;
+        u8 maxlevel;
+
+        gRogueAdvPath.currentRoomType = ADVPATH_ROOM_ROUTE;
+        gRogueRun.currentRouteIndex = r;
+        maxlevel = CalculateWildLevel(0);
+        typeFlags = Rogue_GetTypeFlagsFromArray(&route->wildTypeTable[0], ARRAY_COUNT(route->wildTypeTable));
+
+        GetMapName(name, header->regionMapSectionId, 0);
+        printf("POOL route=%d map=%d.%d layout=%d level=%d types=", r, route->map.group, route->map.num, header->mapLayoutId, maxlevel);
+        for (i = 0; i < ARRAY_COUNT(route->wildTypeTable); ++i)
+            printf("%s%d", i ? "," : "", route->wildTypeTable[i]);
+        printf(" name=");
+        for (i = 0; name[i] != EOS && i < sizeof(name); ++i)
+            printf("%02x", name[i]);
+        printf(" species=");
+
+        // same filters as BeginWildEncounterQuery
+        RogueMonQuery_Begin();
+        RogueMonQuery_IsSpeciesActive();
+        RogueMonQuery_EvosContainType(QUERY_FUNC_INCLUDE, typeFlags);
+        RogueMonQuery_IsLegendary(QUERY_FUNC_EXCLUDE);
+        RogueMonQuery_TransformIntoEggSpecies();
+        RogueMonQuery_TransformIntoEvos(maxlevel - min(6, maxlevel - 1), FALSE, FALSE);
+        RogueMonQuery_IsOfType(QUERY_FUNC_INCLUDE, typeFlags);
+        if (IsCurseActive(EFFECT_WILD_EGG_SPECIES))
+            RogueMonQuery_TransformIntoEggSpecies();
+        RogueMonQuery_CustomFilter(Harness_PrintPoolSpecies, NULL);
+        RogueMonQuery_End();
+        printf("\n");
+    }
+
+    gRogueAdvPath.currentRoomType = savedType;
+    gRogueRun.currentRouteIndex = savedRoute;
+}
+#endif

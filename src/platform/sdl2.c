@@ -102,8 +102,16 @@ void PlatformLog(const char *fmt, ...)
     va_list args;
 #ifdef __vita__
     static bool sStarted = false;
+    FILE *log;
+
+    // keep the previous launch's log (the one that ended in a crash, say)
+    if (!sStarted)
+    {
+        remove(DATA_DIR "log_prev.txt");
+        rename(DATA_DIR "log.txt", DATA_DIR "log_prev.txt");
+    }
     // Reopened per message so every line is committed even if the app is killed
-    FILE *log = fopen(DATA_DIR "log.txt", sStarted ? "a" : "w");
+    log = fopen(DATA_DIR "log.txt", sStarted ? "a" : "w");
 
     sStarted = true;
     va_start(args, fmt);
@@ -159,6 +167,8 @@ static const char *sCoverageSpec;
 static unsigned long sCoverageFrom = 3000;
 static u16 sCoverageKeys;
 extern u16 Harness_CoverageFrame(const char *spec, unsigned long frame, unsigned long fromFrame);
+extern u16 Harness_ScoutFrame(const char *spec, unsigned long frame);
+static const char *sScoutSpec;
 extern void Harness_DumpState(void);
 extern void Harness_BattleFuzzFrame(unsigned long seed);
 extern void NullTrap_Init(void);
@@ -386,6 +396,7 @@ static void InitTestHarness(void)
     if ((v = getenv("ROGUE_STATEDUMP")) != NULL)
         sStateDumpFrame = strtoul(v, NULL, 10);
     sCoverageSpec = getenv("ROGUE_COVERAGE");
+    sScoutSpec = getenv("ROGUE_SCOUT");
     if ((v = getenv("ROGUE_COVERAGE_FROM")) != NULL)
         sCoverageFrom = strtoul(v, NULL, 10);
 
@@ -462,6 +473,8 @@ static bool RunGameFrame(bool draw)
         Harness_DumpState();
     if (sCoverageSpec != NULL)
         sCoverageKeys = Harness_CoverageFrame(sCoverageSpec, sFrameCount, sCoverageFrom);
+    if (sScoutSpec != NULL && sFrameCount >= 2400) // after the save has loaded
+        sCoverageKeys = Harness_ScoutFrame(sScoutSpec, sFrameCount);
     MainLoop();
     if (sPerfLog)
         t1 = NowMs();

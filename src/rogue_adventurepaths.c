@@ -2488,6 +2488,20 @@ void RogueAdv_GetLastInteractedRoomParams()
 
 bool8 Rogue_SafeSmartCheckInternal();
 
+#ifdef PORTABLE
+// PC harness (ROGUE_SCOUT): enter a room of the current path as if it had been
+// picked on the path screen (RogueAdv_WarpLastInteractedRoom)
+void Harness_EnterAdvPathRoom(u8 roomIdx)
+{
+    gRogueRun.adventureRoomId = roomIdx;
+    gRogueAdvPath.currentRoomType = gRogueAdvPath.rooms[roomIdx].roomType;
+    memcpy(&gRogueAdvPath.currentRoomParams, &gRogueAdvPath.rooms[roomIdx].roomParams, sizeof(gRogueAdvPath.currentRoomParams));
+    SetWarpDestination(MAP_GROUP(ROGUE_HUB_TRANSITION), MAP_NUM(ROGUE_HUB_TRANSITION), 0, -1, -1);
+    DoWarp();
+    ResetInitialPlayerAvatarState();
+}
+#endif
+
 void RogueAdv_WarpLastInteractedRoom()
 {
     struct WarpData warp;

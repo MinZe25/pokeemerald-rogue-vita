@@ -958,6 +958,14 @@ static void LoadMapFromWarp(bool32 a1)
     bool8 isIndoors;
 
     LoadCurrentMapData();
+#ifdef PORTABLE
+    {
+        // the last map loaded before a crash
+        void PlatformLog(const char *fmt, ...);
+        PlatformLog("map %d.%d layout=%d scripts=%p\n", gSaveBlock1Ptr->location.mapGroup, gSaveBlock1Ptr->location.mapNum,
+                    gMapHeader.mapLayoutId, (const void *)gMapHeader.mapScripts);
+    }
+#endif
     if (!(sObjectEventLoadFlag & SKIP_OBJECT_EVENT_LOAD))
     {
         if (InTrainerHill())
