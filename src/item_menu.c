@@ -2762,6 +2762,34 @@ bool8 UseRegisteredKeyItemOnField(void)
     return TRUE;
 }
 
+#ifdef PORTABLE
+// Uses the key item registered in wheel slot 1-4 (up, right, down, left) straight
+// away, as picking it on the wheel does (the Vita's right stick)
+bool8 UseRegisteredKeyItemInSlot(u32 slot)
+{
+    u32 taskId;
+    u16 item;
+
+    if (slot < 1 || slot > ARRAY_COUNT(gSaveBlock1Ptr->registeredItems))
+        return FALSE;
+    item = gSaveBlock1Ptr->registeredItems[slot - 1];
+    if (item == ITEM_NONE || !CheckBagHasItem(item, 1) || ItemId_GetFieldFunc(item) == NULL)
+        return FALSE;
+    if (InUnionRoom() == TRUE || InBattlePyramid() || InBattlePike() || InMultiPartnerRoom() == TRUE)
+        return FALSE;
+    HideMapNamePopUpWindow();
+    ChangeBgY_ScreenOff(0, 0, BG_COORD_SET);
+    LockPlayerFieldControls();
+    FreezeObjectEvents();
+    PlayerFreeze();
+    StopPlayerAvatar();
+    gSpecialVar_ItemId = item;
+    taskId = CreateTask(ItemId_GetFieldFunc(item), 8);
+    gTasks[taskId].tUsingRegisteredKeyItem = TRUE;
+    return TRUE;
+}
+#endif
+
 static void HBlankCB_KeyItemWheel(void) {
     u32 vCount = REG_VCOUNT;
     if (vCount >= DISPLAY_HEIGHT) {

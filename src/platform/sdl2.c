@@ -77,6 +77,7 @@ static void ShowMissingRomScreen(const char *problem);
 static uint32_t GetVitaPhys(void);
 #endif
 static void RestartGame(void);
+static uint8_t sRightStickSlot; // see Platform_RightStickSlot
 static void HandleFrontendRequest(int request);
 #ifdef __vita__
 static SDL_AudioStream *sAudioStream = NULL;
@@ -1123,9 +1124,25 @@ static uint32_t GetVitaPhys(void)
         if ((pad.buttons & SCE_CTRL_DOWN)  || pad.ly > 192) p |= PHYS_DOWN;
         if ((pad.buttons & SCE_CTRL_LEFT)  || pad.lx < 64)  p |= PHYS_LEFT;
         if ((pad.buttons & SCE_CTRL_RIGHT) || pad.lx > 192) p |= PHYS_RIGHT;
-        // right stick in any direction: the button the Select action is on
-        if (gFrontendConfig.rightStickSelect && (pad.rx < 64 || pad.rx > 192 || pad.ry < 64 || pad.ry > 192))
-            p |= gFrontendConfig.actionButton[ACTION_SELECT];
+        // right stick: the key item wheel slot it's tilted towards (1 up,
+        // 2 right, 3 down, 4 left), reported on the frame it gets there
+        sRightStickSlot = 0;
+        if (gFrontendConfig.rightStickSelect)
+        {
+            static uint8_t sPrevSlot;
+            int dx = pad.rx - 128, dy = pad.ry - 128;
+            uint8_t slot = 0;
+            if (dx * dx + dy * dy > 64 * 64)
+            {
+                if ((dx < 0 ? -dx : dx) > (dy < 0 ? -dy : dy))
+                    slot = dx < 0 ? 4 : 2;
+                else
+                    slot = dy < 0 ? 1 : 3;
+            }
+            if (slot != 0 && slot != sPrevSlot)
+                sRightStickSlot = slot;
+            sPrevSlot = slot;
+        }
     }
     // tapping the front screen opens the menu (the game never uses touch)
     if (sceTouchPeek(SCE_TOUCH_PORT_FRONT, &touch, 1) >= 0)
@@ -1138,6 +1155,13 @@ static uint32_t GetVitaPhys(void)
     return p;
 }
 #endif
+
+// Field input (src/field_control_avatar.c): the key item wheel slot (1-4) the
+// right stick was tilted towards this frame, or 0 (Vita only)
+u8 Platform_RightStickSlot(void)
+{
+    return sRightStickSlot;
+}
 
 static void ReadPhysButtons(void)
 {

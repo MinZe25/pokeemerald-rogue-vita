@@ -580,7 +580,7 @@ void Frontend_DrawMenu(uint16_t *frame)
             DrawRow(frame, i, sCursor == i, sActionNames[i], name, true);
         }
         DrawRow(frame, REMAP_TOUCH, sCursor == REMAP_TOUCH, "Touch=menu", gFrontendConfig.touchOpensMenu ? "On" : "Off", true);
-        DrawRow(frame, REMAP_RSTICK, sCursor == REMAP_RSTICK, "R stick", gFrontendConfig.rightStickSelect ? "Select" : "Off", true);
+        DrawRow(frame, REMAP_RSTICK, sCursor == REMAP_RSTICK, "R stick", gFrontendConfig.rightStickSelect ? "Items" : "Off", true);
         DrawRow(frame, REMAP_DEFAULTS, sCursor == REMAP_DEFAULTS, "Defaults", NULL, true);
         DrawRow(frame, REMAP_DEFAULTS + 1, sCursor == REMAP_DEFAULTS + 1, "Back", NULL, true);
         DrawText(frame, 12, H - 14, "X:change  O:back", COLOR_DISABLED);

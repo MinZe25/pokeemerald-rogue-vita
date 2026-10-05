@@ -95,6 +95,13 @@ void FieldClearPlayerInput(struct FieldInput *input)
     input->dpadDirection = 0;
 }
 
+#ifdef PORTABLE
+// Vita right stick: key item wheel slot (1-4) tilted towards this frame
+static u8 sRightStickSlot;
+u8 Platform_RightStickSlot(void);
+bool8 UseRegisteredKeyItemInSlot(u32 slot);
+#endif
+
 void FieldGetPlayerInput(struct FieldInput *input, u16 newKeys, u16 heldKeys)
 {
     u8 tileTransitionState = gPlayerAvatar.tileTransitionState;
@@ -109,6 +116,9 @@ void FieldGetPlayerInput(struct FieldInput *input, u16 newKeys, u16 heldKeys)
                 input->pressedStartButton = TRUE;
             if (newKeys & SELECT_BUTTON)
                 input->pressedSelectButton = TRUE;
+#ifdef PORTABLE
+            sRightStickSlot = Platform_RightStickSlot();
+#endif
             if (newKeys & A_BUTTON)
                 input->pressedAButton = TRUE;
             if (newKeys & B_BUTTON)
@@ -232,6 +242,19 @@ int ProcessPlayerFieldInput(struct FieldInput *input)
     }
     if (input->pressedSelectButton && UseRegisteredKeyItemOnField() == TRUE)
         return TRUE;
+#ifdef PORTABLE
+    if (sRightStickSlot != 0)
+    {
+        u8 slot = sRightStickSlot;
+        bool8 used;
+        void PlatformLog(const char *fmt, ...);
+        sRightStickSlot = 0;
+        used = UseRegisteredKeyItemInSlot(slot);
+        PlatformLog("right stick: slot %d item %d used %d\n", slot, gSaveBlock1Ptr->registeredItems[slot - 1], used);
+        if (used)
+            return TRUE;
+    }
+#endif
 
 #if DEBUG_OVERWORLD_MENU == TRUE && DEBUG_OVERWORLD_IN_MENU == FALSE
     if (input->input_field_1_2)
