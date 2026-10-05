@@ -9,6 +9,11 @@
 #include "platform/frontend.h"
 #include "platform/savestate.h"
 #include "platform/frontend_font.h"
+#include "platform/qrcode.h"
+
+// game side (src/showdown_export.c)
+int Showdown_ExportParty(char *buf, int size);
+void PlatformLog(const char *fmt, ...);
 
 #define W 240
 #define H 160
@@ -35,7 +40,8 @@ static uint16_t sMenuBackground[W * H];
 static uint32_t sPrevPhys;
 static int sHoldFrames;
 static int sCursor;
-static int sMenuPage; // 0 main, 1 remap
+static int sMenuPage; // 0 main, 1 remap, 2 party QR
+static int sQrSize;    // 0: the party didn't fit in a QR code
 static int sRemapWaiting = -1;
 static int sStateSlot = 1;
 static int sPendingSaveFile;
@@ -73,6 +79,7 @@ static void SetDefaults(void)
     gFrontendConfig.actionButton[ACTION_FAST_FORWARD] = PHYS_TRIANGLE;
     gFrontendConfig.actionButton[ACTION_MENU] = PHYS_SQUARE;
     gFrontendConfig.touchOpensMenu = 1;
+    gFrontendConfig.rightStickSelect = 1;
 }
 
 static const char *DataPath(const char *name)
@@ -110,6 +117,8 @@ void Frontend_Init(const char *dataDir)
             gFrontendConfig.touchOpensMenu = value != 0;
         else if (!strcmp(key, "save_anywhere"))
             gFrontendConfig.saveAnywhere = value != 0;
+        else if (!strcmp(key, "right_stick_select"))
+            gFrontendConfig.rightStickSelect = value != 0;
         else
         {
             for (int i = 0; i < ACTION_COUNT; i++)
@@ -130,9 +139,9 @@ void Frontend_SaveConfig(void)
 
     if (f == NULL)
         return;
-    fprintf(f, "scale=%d\nsmooth=%d\nff_speed=%d\nsave_file=%d\ntouch_menu=%d\nsave_anywhere=%d\n", gFrontendConfig.scale,
-            gFrontendConfig.smoothFilter, gFrontendConfig.fastForwardSpeed, gFrontendConfig.saveFile,
-            gFrontendConfig.touchOpensMenu, gFrontendConfig.saveAnywhere);
+    fprintf(f, "scale=%d\nsmooth=%d\nff_speed=%d\nsave_file=%d\ntouch_menu=%d\nsave_anywhere=%d\nright_stick_select=%d\n",
+            gFrontendConfig.scale, gFrontendConfig.smoothFilter, gFrontendConfig.fastForwardSpeed, gFrontendConfig.saveFile,
+            gFrontendConfig.touchOpensMenu, gFrontendConfig.saveAnywhere, gFrontendConfig.rightStickSelect);
     for (int i = 0; i < ACTION_COUNT; i++)
     {
         int bit = 0;
@@ -232,6 +241,7 @@ enum
     ITEM_FILTER,
     ITEM_FF_SPEED,
     ITEM_SAVE_ANYWHERE,
+    ITEM_PARTY_QR,
     ITEM_REMAP,
     ITEM_SAVE_FILE,
     ITEM_RESET,
@@ -239,9 +249,10 @@ enum
     ITEM_COUNT,
 };
 
-#define REMAP_ITEMS (ACTION_COUNT + 3) // actions, touch, defaults, back
+#define REMAP_ITEMS (ACTION_COUNT + 4) // actions, touch, right stick, defaults, back
 #define REMAP_TOUCH (ACTION_COUNT)
-#define REMAP_DEFAULTS (ACTION_COUNT + 1)
+#define REMAP_RSTICK (ACTION_COUNT + 1)
+#define REMAP_DEFAULTS (ACTION_COUNT + 2)
 
 static int WrapAdd(int value, int delta, int count)
 {
@@ -301,6 +312,16 @@ int Frontend_UpdateMenu(uint32_t phys)
     if (pressed & PHYS_DOWN)
         sCursor = WrapAdd(sCursor, 1, items);
 
+    if (sMenuPage == 2)
+    {
+        if (pressed & ~(PHYS_UP | PHYS_DOWN | PHYS_LEFT | PHYS_RIGHT))
+        {
+            sMenuPage = 0;
+            sCursor = ITEM_PARTY_QR;
+        }
+        return FE_REQUEST_NONE;
+    }
+
     if (sMenuPage == 1)
     {
         if (pressed & PHYS_CIRCLE)
@@ -318,13 +339,18 @@ int Frontend_UpdateMenu(uint32_t phys)
             {
                 gFrontendConfig.touchOpensMenu = !gFrontendConfig.touchOpensMenu;
             }
+            else if (sCursor == REMAP_RSTICK)
+            {
+                gFrontendConfig.rightStickSelect = !gFrontendConfig.rightStickSelect;
+            }
             else if (sCursor == REMAP_DEFAULTS)
             {
                 int scale = gFrontendConfig.scale, smooth = gFrontendConfig.smoothFilter;
                 int ff = gFrontendConfig.fastForwardSpeed, saveFile = gFrontendConfig.saveFile;
-                int touch = gFrontendConfig.touchOpensMenu;
+                int touch = gFrontendConfig.touchOpensMenu, rstick = gFrontendConfig.rightStickSelect;
                 SetDefaults();
                 gFrontendConfig.touchOpensMenu = touch;
+                gFrontendConfig.rightStickSelect = rstick;
                 gFrontendConfig.scale = scale;
                 gFrontendConfig.smoothFilter = smooth;
                 gFrontendConfig.fastForwardSpeed = ff;
@@ -399,6 +425,15 @@ int Frontend_UpdateMenu(uint32_t phys)
         case ITEM_SAVE_ANYWHERE:
             gFrontendConfig.saveAnywhere = !gFrontendConfig.saveAnywhere;
             break;
+        case ITEM_PARTY_QR:
+        {
+            static char text[QR_MAX_TEXT];
+            int len = Showdown_ExportParty(text, sizeof(text));
+            sQrSize = len > 0 ? Qr_Encode((const uint8_t *)text, len) : 0;
+            PlatformLog("party QR: %d bytes, %d modules\n%s\n", len, sQrSize, text);
+            sMenuPage = 2;
+            break;
+        }
         case ITEM_REMAP:
             sMenuPage = 1;
             sCursor = 0;
@@ -473,6 +508,35 @@ static void DrawRow(uint16_t *frame, int row, bool selected, const char *label, 
         DrawText(frame, 136, y, value, color);
 }
 
+// The party as Showdown export text in a QR code, black on white with a quiet zone
+static void DrawPartyQr(uint16_t *frame)
+{
+    static const char *const sHelp[] = { "PARTY", "", "Scan it, copy", "the text and", "paste it in", "the Showdown", "calc: Import", "", "any button:", "back", NULL };
+    int quiet = 4, scale, side, x0, y0;
+
+    if (sQrSize == 0)
+    {
+        DrawText(frame, 12, 20, "No party, or too", COLOR_TEXT);
+        DrawText(frame, 12, 30, "big for a QR code", COLOR_TEXT);
+        return;
+    }
+    if (sQrSize + 2 * quiet > H - 8)
+        quiet = 2;
+    scale = (H - 8) / (sQrSize + 2 * quiet);
+    if (scale < 1)
+        scale = 1;
+    side = (sQrSize + 2 * quiet) * scale;
+    x0 = 6;
+    y0 = (H - side) / 2;
+    FillRect(frame, x0, y0, side, side, 0x7FFF | 0x8000);
+    for (int y = 0; y < sQrSize; y++)
+        for (int x = 0; x < sQrSize; x++)
+            if (Qr_Module(x, y))
+                FillRect(frame, x0 + (x + quiet) * scale, y0 + (y + quiet) * scale, scale, scale, 0x8000);
+    for (int i = 0; sHelp[i] != NULL; i++)
+        DrawText(frame, x0 + side + 6, 12 + i * 10, sHelp[i], i == 0 ? COLOR_TITLE : COLOR_TEXT);
+}
+
 void Frontend_DrawMenu(uint16_t *frame)
 {
     char value[32];
@@ -480,7 +544,11 @@ void Frontend_DrawMenu(uint16_t *frame)
     memcpy(frame, sMenuBackground, sizeof(sMenuBackground));
     FillRect(frame, 6, 4, W - 12, H - 8, COLOR_PANEL);
 
-    if (sMenuPage == 0)
+    if (sMenuPage == 2)
+    {
+        DrawPartyQr(frame);
+    }
+    else if (sMenuPage == 0)
     {
         bool states = Savestate_Supported();
         DrawText(frame, 12, 8, "EMERALD ROGUE - MENU", COLOR_TITLE);
@@ -495,6 +563,7 @@ void Frontend_DrawMenu(uint16_t *frame)
         snprintf(value, sizeof(value), "< %dx >", gFrontendConfig.fastForwardSpeed);
         DrawRow(frame, ITEM_FF_SPEED, sCursor == ITEM_FF_SPEED, "Fast fwd", value, true);
         DrawRow(frame, ITEM_SAVE_ANYWHERE, sCursor == ITEM_SAVE_ANYWHERE, "Save anywhere", gFrontendConfig.saveAnywhere ? "< On >" : "< Off >", true);
+        DrawRow(frame, ITEM_PARTY_QR, sCursor == ITEM_PARTY_QR, "Party QR", NULL, true);
         DrawRow(frame, ITEM_REMAP, sCursor == ITEM_REMAP, "Buttons...", NULL, true);
         snprintf(value, sizeof(value), "< %d >%s", sPendingSaveFile, sPendingSaveFile != gFrontendConfig.saveFile ? " X=load" : "");
         DrawRow(frame, ITEM_SAVE_FILE, sCursor == ITEM_SAVE_FILE, "Save file", value, states);
@@ -511,6 +580,7 @@ void Frontend_DrawMenu(uint16_t *frame)
             DrawRow(frame, i, sCursor == i, sActionNames[i], name, true);
         }
         DrawRow(frame, REMAP_TOUCH, sCursor == REMAP_TOUCH, "Touch=menu", gFrontendConfig.touchOpensMenu ? "On" : "Off", true);
+        DrawRow(frame, REMAP_RSTICK, sCursor == REMAP_RSTICK, "R stick", gFrontendConfig.rightStickSelect ? "Select" : "Off", true);
         DrawRow(frame, REMAP_DEFAULTS, sCursor == REMAP_DEFAULTS, "Defaults", NULL, true);
         DrawRow(frame, REMAP_DEFAULTS + 1, sCursor == REMAP_DEFAULTS + 1, "Back", NULL, true);
         DrawText(frame, 12, H - 14, "X:change  O:back", COLOR_DISABLED);

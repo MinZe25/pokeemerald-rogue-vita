@@ -698,7 +698,7 @@ endif
 # resets). The platform side (SDL, menu) stays outside. Needs ELF (__start_/
 # __stop_ symbols), so Windows links as before.
 PLATFORM_SIDE_OBJS := src/platform/sdl2.o src/platform/frontend.o src/platform/savestate.o src/platform/nulltrap.o \
-                      src/platform/rom_assets.o src/platform/rom_assets_table.o
+                      src/platform/rom_assets.o src/platform/rom_assets_table.o src/platform/qrcode.o
 GAME_SIDE_OBJS = $(filter-out $(PLATFORM_SIDE_OBJS),$(OBJS_REL))
 ifeq ($(TARGET_OS),WINDOWS)
 LINK_OBJS = $(OBJS_REL)

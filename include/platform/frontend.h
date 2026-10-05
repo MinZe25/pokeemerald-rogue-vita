@@ -65,6 +65,7 @@ struct FrontendConfig
     int saveFile;         // 1..3
     int touchOpensMenu;
     int saveAnywhere;     // real in-game Save during runs / where saving is disabled
+    int rightStickSelect; // tilting the right stick presses the Select action (Vita)
     uint32_t actionButton[ACTION_COUNT]; // PHYS_* bit per action
 };
 

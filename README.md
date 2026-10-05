@@ -69,7 +69,8 @@ Opened with Square by default (the button can be remapped, and the touch screen 
 - **Scale:** 1x, 2x, 3x, Fit (keeps the aspect ratio) or Stretch, with a Sharp or Smooth filter.
 - **Fast forward:** 2x to 5x while held.
 - **Save anywhere:** adds a real in-game **Save** during adventures (like the save-scum charm), and loading such a save puts you back where you were. Handy against crashes.
-- **Buttons:** remap every action, including the menu button, and turn touch-to-open on or off.
+- **Party QR:** shows your party as a QR code in Pokémon Showdown's export format. Scan it with your phone, copy the text and paste it into the [Showdown damage calculator](https://calc.pokemonshowdown.com/)'s Import box.
+- **Buttons:** remap every action, including the menu button, turn touch-to-open on or off, and let the right stick press Select (Rogue's shortcut wheel).
 - **Save file:** 3 independent save files.
 - **Reset game** and **Quit**.
 

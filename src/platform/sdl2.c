@@ -1123,6 +1123,9 @@ static uint32_t GetVitaPhys(void)
         if ((pad.buttons & SCE_CTRL_DOWN)  || pad.ly > 192) p |= PHYS_DOWN;
         if ((pad.buttons & SCE_CTRL_LEFT)  || pad.lx < 64)  p |= PHYS_LEFT;
         if ((pad.buttons & SCE_CTRL_RIGHT) || pad.lx > 192) p |= PHYS_RIGHT;
+        // right stick in any direction: the button the Select action is on
+        if (gFrontendConfig.rightStickSelect && (pad.rx < 64 || pad.rx > 192 || pad.ry < 64 || pad.ry > 192))
+            p |= gFrontendConfig.actionButton[ACTION_SELECT];
     }
     // tapping the front screen opens the menu (the game never uses touch)
     if (sceTouchPeek(SCE_TOUCH_PORT_FRONT, &touch, 1) >= 0)
