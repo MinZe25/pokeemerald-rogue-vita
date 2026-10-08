@@ -279,6 +279,7 @@ enum { COV_NONE, COV_MOVES, COV_ABILITIES, COV_MEGAS, COV_ANIMS };
 static u8 sCovAnimType, sCovAnimId, sCovAnimEnemy, sCovAnimState;
 #define COV_ENV_VARIANTS 5
 #define COV_TURNS        3      // turns of move use before the battle is ended
+static u16 sCovEnemyMove; // opponent's move in the moves pass (ROGUE_DUEL)
 static unsigned long sCovAnimFrames; // frames with a battle anim script running
 #define COV_CASE_FRAMES  36000  // longer than this: hang
 
@@ -407,6 +408,21 @@ static void CovStartCase(void)
         snprintf(line, sizeof(line), "CASE %s move=%d(%s) variant=%lu doubles=%d species=%d/%d items=%d/%d\n",
                  sCovTag, move, name, (unsigned long)variant, doubles, pSpecies, eSpecies, pItem, eItem);
         m[0] = m[1] = m[2] = m[3] = move;
+        // ROGUE_DUEL=a:b: the player uses move a and the opponent move b
+        // (every case of the moves pass is then a new seed for that pair)
+        sCovEnemyMove = move;
+        if (getenv("ROGUE_DUEL") != NULL)
+        {
+            unsigned a = 0, b = 0;
+            sscanf(getenv("ROGUE_DUEL"), "%u:%u", &a, &b);
+            if (a > 0 && a < MOVES_COUNT && b > 0 && b < MOVES_COUNT)
+            {
+                m[0] = m[1] = m[2] = m[3] = a;
+                sCovEnemyMove = b;
+                snprintf(line, sizeof(line), "CASE %s duel=%u:%u doubles=%d species=%d/%d items=%d/%d\n",
+                         sCovTag, a, b, doubles, pSpecies, eSpecies, pItem, eItem);
+            }
+        }
         break;
     }
     case COV_ABILITIES:
@@ -517,7 +533,7 @@ static void CovStartCase(void)
         // strong enough to last a few turns
         CovCreateMon(&gEnemyParty[i], GetMonData(&gEnemyParty[i], MON_DATA_SPECIES), num, item);
         if (sCovPass == COV_MOVES)
-            CovSetMoves(&gEnemyParty[i], move, move, move, move);
+            CovSetMoves(&gEnemyParty[i], sCovEnemyMove, sCovEnemyMove, sCovEnemyMove, sCovEnemyMove);
         else
             CovSetMoves(&gEnemyParty[i], CovMove(), CovMove(), CovMove(), CovMove());
     }

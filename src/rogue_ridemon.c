@@ -1037,7 +1037,9 @@ bool8 Rogue_RideMonIsCollisionExempt(struct ObjectEvent* obstacle, struct Object
         {
             struct ObjectEventTemplate* template = GetBaseTemplateForObjectEvent(obstacle);
 
-            if(template->flagId == FLAG_ROGUE_RIVAL_DISABLED)
+            // objects spawned at runtime (wild overworld mons) have no template:
+            // NULL here read the BIOS on GBA and crashed on PC / Vita
+            if(template != NULL && template->flagId == FLAG_ROGUE_RIVAL_DISABLED)
                 return FALSE;
         }
 
