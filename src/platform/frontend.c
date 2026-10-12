@@ -69,6 +69,7 @@ static void SetDefaults(void)
     gFrontendConfig.scale = SCALE_3X;
     gFrontendConfig.smoothFilter = 0;
     gFrontendConfig.fastForwardSpeed = 3;
+    gFrontendConfig.fastForwardToggle = 0;
     gFrontendConfig.saveFile = 1;
     gFrontendConfig.actionButton[ACTION_A] = PHYS_CROSS;
     gFrontendConfig.actionButton[ACTION_B] = PHYS_CIRCLE;
@@ -111,6 +112,8 @@ void Frontend_Init(const char *dataDir)
             gFrontendConfig.smoothFilter = value != 0;
         else if (!strcmp(key, "ff_speed") && value >= 2 && value <= 5)
             gFrontendConfig.fastForwardSpeed = value;
+        else if (!strcmp(key, "ff_toggle"))
+            gFrontendConfig.fastForwardToggle = value != 0;
         else if (!strcmp(key, "save_file") && value >= 1 && value <= SAVE_FILES)
             gFrontendConfig.saveFile = value;
         else if (!strcmp(key, "touch_menu"))
@@ -142,6 +145,7 @@ void Frontend_SaveConfig(void)
     fprintf(f, "scale=%d\nsmooth=%d\nff_speed=%d\nsave_file=%d\ntouch_menu=%d\nsave_anywhere=%d\nright_stick_select=%d\n",
             gFrontendConfig.scale, gFrontendConfig.smoothFilter, gFrontendConfig.fastForwardSpeed, gFrontendConfig.saveFile,
             gFrontendConfig.touchOpensMenu, gFrontendConfig.saveAnywhere, gFrontendConfig.rightStickSelect);
+    fprintf(f, "ff_toggle=%d\n", gFrontendConfig.fastForwardToggle);
     for (int i = 0; i < ACTION_COUNT; i++)
     {
         int bit = 0;
@@ -168,7 +172,17 @@ uint16_t Frontend_MapButtons(uint32_t phys)
 
 bool Frontend_FastForwardHeld(uint32_t phys)
 {
-    return (phys & gFrontendConfig.actionButton[ACTION_FAST_FORWARD]) != 0;
+    static bool sToggled;
+    static uint32_t sPrevPhys;
+    bool pressed = (phys & gFrontendConfig.actionButton[ACTION_FAST_FORWARD]) != 0;
+
+    if (!gFrontendConfig.fastForwardToggle)
+        return pressed;
+    // a press (not the held button) flips the state
+    if (pressed && !(sPrevPhys & gFrontendConfig.actionButton[ACTION_FAST_FORWARD]))
+        sToggled = !sToggled;
+    sPrevPhys = phys;
+    return sToggled;
 }
 
 // Called by the game's start menu (src/start_menu.c)
@@ -420,7 +434,7 @@ int Frontend_UpdateMenu(uint32_t phys)
             gFrontendConfig.smoothFilter = !gFrontendConfig.smoothFilter;
             break;
         case ITEM_FF_SPEED:
-            gFrontendConfig.fastForwardSpeed = WrapAdd(gFrontendConfig.fastForwardSpeed - 2, 1, 4) + 2;
+            gFrontendConfig.fastForwardToggle = !gFrontendConfig.fastForwardToggle;
             break;
         case ITEM_SAVE_ANYWHERE:
             gFrontendConfig.saveAnywhere = !gFrontendConfig.saveAnywhere;
@@ -560,7 +574,7 @@ void Frontend_DrawMenu(uint16_t *frame)
         DrawRow(frame, ITEM_SCALE, sCursor == ITEM_SCALE, "Scale", value, true);
         snprintf(value, sizeof(value), "< %s >", gFrontendConfig.smoothFilter ? "Smooth" : "Sharp");
         DrawRow(frame, ITEM_FILTER, sCursor == ITEM_FILTER, "Filter", value, true);
-        snprintf(value, sizeof(value), "< %dx >", gFrontendConfig.fastForwardSpeed);
+        snprintf(value, sizeof(value), "< %dx %s >", gFrontendConfig.fastForwardSpeed, gFrontendConfig.fastForwardToggle ? "Toggle" : "Hold");
         DrawRow(frame, ITEM_FF_SPEED, sCursor == ITEM_FF_SPEED, "Fast fwd", value, true);
         DrawRow(frame, ITEM_SAVE_ANYWHERE, sCursor == ITEM_SAVE_ANYWHERE, "Save anywhere", gFrontendConfig.saveAnywhere ? "< On >" : "< Off >", true);
         DrawRow(frame, ITEM_PARTY_QR, sCursor == ITEM_PARTY_QR, "Party QR", NULL, true);

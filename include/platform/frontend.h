@@ -66,6 +66,7 @@ struct FrontendConfig
     int touchOpensMenu;
     int saveAnywhere;     // real in-game Save during runs / where saving is disabled
     int rightStickSelect; // tilting the right stick presses the Select action (Vita)
+    int fastForwardToggle; // 0: fast forward while the button is held, 1: a press toggles it
     uint32_t actionButton[ACTION_COUNT]; // PHYS_* bit per action
 };
 
