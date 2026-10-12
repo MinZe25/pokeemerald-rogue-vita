@@ -254,6 +254,7 @@ enum
     ITEM_SCALE,
     ITEM_FILTER,
     ITEM_FF_SPEED,
+    ITEM_FF_MODE,
     ITEM_SAVE_ANYWHERE,
     ITEM_PARTY_QR,
     ITEM_REMAP,
@@ -397,6 +398,9 @@ int Frontend_UpdateMenu(uint32_t phys)
         case ITEM_FF_SPEED:
             gFrontendConfig.fastForwardSpeed = WrapAdd(gFrontendConfig.fastForwardSpeed - 2, delta, 4) + 2;
             break;
+        case ITEM_FF_MODE:
+            gFrontendConfig.fastForwardToggle = !gFrontendConfig.fastForwardToggle;
+            break;
         case ITEM_SAVE_ANYWHERE:
             gFrontendConfig.saveAnywhere = !gFrontendConfig.saveAnywhere;
             break;
@@ -434,6 +438,9 @@ int Frontend_UpdateMenu(uint32_t phys)
             gFrontendConfig.smoothFilter = !gFrontendConfig.smoothFilter;
             break;
         case ITEM_FF_SPEED:
+            gFrontendConfig.fastForwardSpeed = WrapAdd(gFrontendConfig.fastForwardSpeed - 2, 1, 4) + 2;
+            break;
+        case ITEM_FF_MODE:
             gFrontendConfig.fastForwardToggle = !gFrontendConfig.fastForwardToggle;
             break;
         case ITEM_SAVE_ANYWHERE:
@@ -574,8 +581,9 @@ void Frontend_DrawMenu(uint16_t *frame)
         DrawRow(frame, ITEM_SCALE, sCursor == ITEM_SCALE, "Scale", value, true);
         snprintf(value, sizeof(value), "< %s >", gFrontendConfig.smoothFilter ? "Smooth" : "Sharp");
         DrawRow(frame, ITEM_FILTER, sCursor == ITEM_FILTER, "Filter", value, true);
-        snprintf(value, sizeof(value), "< %dx %s >", gFrontendConfig.fastForwardSpeed, gFrontendConfig.fastForwardToggle ? "Toggle" : "Hold");
+        snprintf(value, sizeof(value), "< %dx >", gFrontendConfig.fastForwardSpeed);
         DrawRow(frame, ITEM_FF_SPEED, sCursor == ITEM_FF_SPEED, "Fast fwd", value, true);
+        DrawRow(frame, ITEM_FF_MODE, sCursor == ITEM_FF_MODE, "Fast fwd mode", gFrontendConfig.fastForwardToggle ? "< Toggle >" : "< Hold >", true);
         DrawRow(frame, ITEM_SAVE_ANYWHERE, sCursor == ITEM_SAVE_ANYWHERE, "Save anywhere", gFrontendConfig.saveAnywhere ? "< On >" : "< Off >", true);
         DrawRow(frame, ITEM_PARTY_QR, sCursor == ITEM_PARTY_QR, "Party QR", NULL, true);
         DrawRow(frame, ITEM_REMAP, sCursor == ITEM_REMAP, "Buttons...", NULL, true);
@@ -583,7 +591,7 @@ void Frontend_DrawMenu(uint16_t *frame)
         DrawRow(frame, ITEM_SAVE_FILE, sCursor == ITEM_SAVE_FILE, "Save file", value, states);
         DrawRow(frame, ITEM_RESET, sCursor == ITEM_RESET, "Reset game", NULL, states);
         DrawRow(frame, ITEM_QUIT, sCursor == ITEM_QUIT, "Quit", NULL, true);
-        DrawText(frame, 12, H - 14, "X:select  O:close", COLOR_DISABLED);
+        DrawText(frame, 12, H - 12, "X:select  O:close", COLOR_DISABLED);
     }
     else
     {
